@@ -49,7 +49,7 @@ impl ShellIntegration {
             .join("ELYTerminal")
             .join("shell-integration");
         install(&dir)?;
-        let found = scan::scan();
+        let found = scan::cached().to_vec();
         for shell in &found {
             log::info!(
                 "shells: {} ({}), {}",
@@ -95,6 +95,12 @@ pub fn install(dir: &Path) -> anyhow::Result<()> {
 
 /// How to start `shell`, or the login shell when empty, in `cwd` so it reports its folder.
 pub fn launch(shell: &str, cwd: PathBuf, dir: &Path) -> anyhow::Result<Launch> {
+    #[cfg(windows)]
+    if shell.is_empty()
+        && let Some(found) = scan::best(scan::cached())
+    {
+        return launch_found(found, cwd, dir);
+    }
     if shell.is_empty() {
         return start(default_shell()?, Vec::new(), false, None, cwd, dir);
     }

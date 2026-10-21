@@ -5,6 +5,7 @@ use std::{
     env,
     path::{Component, Path, PathBuf, Prefix},
     process::Command,
+    sync::OnceLock,
 };
 
 /// The kind of program a shell is, which decides how it starts.
@@ -157,6 +158,12 @@ pub fn scan() -> Vec<Found> {
             .then_with(|| left.name.cmp(&right.name))
     });
     found
+}
+
+/// The scan's answer, found once and kept for the sessions a window opens.
+pub fn cached() -> &'static [Found] {
+    static FOUND: OnceLock<Vec<Found>> = OnceLock::new();
+    FOUND.get_or_init(scan)
 }
 
 #[cfg(windows)]
