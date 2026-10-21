@@ -15,7 +15,8 @@ use gpui::{
 use super::{SettingsWindow, set, switch};
 use crate::{
     settings::{
-        CursorStyle, FONT_SIZE, LINE_HEIGHT, OPACITY, PADDING, Settings, SettingsStore, language,
+        CursorStyle, FONT_SIZE, LINE_HEIGHT, OPACITY, PADDING, Settings, SettingsStore,
+        UI_FONT_SIZE, language,
     },
     themes::{self, TerminalTheme},
 };
@@ -172,6 +173,18 @@ impl SettingsWindow {
                     .child(format!("{opacity}%")),
             );
         let background = SettingsSection::new(language::message(cx, "settings.window.section"))
+            .row(
+                SettingsRow::new(language::message(cx, "settings.window.ui_size")).control(
+                    self.number(
+                        this,
+                        "ui_font_size",
+                        settings.ui_font_size,
+                        &UI_FONT_SIZE,
+                        (1.0, 0),
+                        |settings, size| settings.ui_font_size = size,
+                    ),
+                ),
+            )
             .row(
                 SettingsRow::new(language::message(cx, "settings.window.opacity")).control(opacity),
             )

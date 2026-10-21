@@ -80,6 +80,8 @@ pub struct Settings {
     /// Families tried in order for a character Font family lacks.
     pub font_fallbacks: Vec<String>,
     pub font_size: f32,
+    /// The size of the interface's rem, in pixels; the terminal's font has its own size.
+    pub ui_font_size: f32,
     pub line_height: f32,
     pub ligatures: bool,
     pub cursor_style: CursorStyle,
@@ -128,6 +130,7 @@ impl Default for Settings {
             font_family: "JetBrains Mono".into(),
             font_fallbacks: Vec::new(),
             font_size: 13.0,
+            ui_font_size: 16.0,
             line_height: 1.2,
             ligatures: true,
             cursor_style: CursorStyle::Block,
@@ -158,6 +161,7 @@ impl Default for Settings {
 }
 
 pub const FONT_SIZE: RangeInclusive<f32> = 6.0..=72.0;
+pub const UI_FONT_SIZE: RangeInclusive<f32> = 10.0..=24.0;
 pub const LINE_HEIGHT: RangeInclusive<f32> = 1.0..=2.0;
 pub const OPACITY: RangeInclusive<f32> = 0.3..=1.0;
 pub const PADDING: RangeInclusive<f32> = 0.0..=64.0;
@@ -197,6 +201,7 @@ impl Settings {
     /// Every value inside its range, every theme built in; the error names the field.
     pub fn validate(&self) -> anyhow::Result<()> {
         within("font_size", self.font_size, &FONT_SIZE)?;
+        within("ui_font_size", self.ui_font_size, &UI_FONT_SIZE)?;
         within("line_height", self.line_height, &LINE_HEIGHT)?;
         within("background_opacity", self.background_opacity, &OPACITY)?;
         within("padding_x", self.padding_x, &PADDING)?;

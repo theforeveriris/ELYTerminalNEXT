@@ -403,7 +403,8 @@ impl SettingsWindow {
 }
 
 impl Render for SettingsWindow {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(SettingsStore::get(cx).ui_font_size));
         // Built on the first frame, as it needs this window's own handle.
         let page = match &self.page {
             Some(page) => page.clone(),

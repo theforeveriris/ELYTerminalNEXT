@@ -12,7 +12,7 @@ use ely_gpui_component::{
 };
 use gpui::{
     AnyElement, App, Context, Entity, IntoElement, Render, SharedString, StyleRefinement, Styled,
-    Window, div, prelude::*,
+    Window, div, prelude::*, px,
 };
 
 use super::{
@@ -219,6 +219,7 @@ impl Workspace {
 impl Render for Workspace {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.background.fit(window);
+        window.set_rem_size(px(SettingsStore::get(cx).ui_font_size));
         let now = Instant::now();
         self.tick(now, cx);
         let settings = SettingsStore::get(cx);

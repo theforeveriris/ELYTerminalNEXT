@@ -75,6 +75,16 @@ fn a_window_place_out_of_range_names_its_field() {
 }
 
 #[test]
+fn an_interface_size_out_of_range_names_its_field() {
+    let settings = Settings {
+        ui_font_size: 30.0,
+        ..Settings::default()
+    };
+    let error = settings.validate().expect_err("too large");
+    assert_eq!(error.to_string(), "ui_font_size is 30, outside 10 to 24");
+}
+
+#[test]
 fn a_value_out_of_range_names_its_field() {
     let settings = Settings {
         line_height: 2.5,
