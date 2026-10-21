@@ -96,6 +96,30 @@ pub fn install(dir: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Removes the integration folder, and every script in it.
+pub fn remove(dir: &Path) -> anyhow::Result<()> {
+    match fs::remove_dir_all(dir) {
+        Ok(()) => {
+            log::info!("shell integration: removed {}", dir.display());
+            Ok(())
+        }
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error)
+            .with_context(|| format!("shell integration: cannot remove {}", dir.display())),
+    }
+}
+
+/// Writes every script afresh, as a repair after an edit or a half-written install.
+pub fn repair(dir: &Path) -> anyhow::Result<()> {
+    remove(dir)?;
+    install(dir)
+}
+
+/// Repairs the scripts the app installed at start.
+pub fn repair_installed(cx: &App) -> anyhow::Result<()> {
+    repair(&cx.global::<ShellIntegration>().0)
+}
+
 /// How to start `shell`, or the login shell when empty, in `cwd` so it reports its folder.
 pub fn launch(shell: &str, cwd: PathBuf, dir: &Path) -> anyhow::Result<Launch> {
     #[cfg(windows)]

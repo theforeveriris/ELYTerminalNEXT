@@ -14,7 +14,7 @@ use crate::{
     settings::{OptionAsAlt, SCROLLBACK, SettingsStore, StartIn, language},
     term::{
         input::{self, Find, NextPrompt, PreviousPrompt},
-        shell::Shells,
+        shell::{ShellIntegration, Shells, repair_installed},
     },
     updates::{self, Updates, VERSION},
     workspace::{
@@ -108,12 +108,34 @@ impl SettingsWindow {
                     });
                 }
             });
+        let repair = Button::new("repair-integration", "Reinstall")
+            .size(ControlSize::Sm)
+            .on_click({
+                let this = this.clone();
+                move |_, _, cx| {
+                    let result = repair_installed(cx);
+                    this.update(cx, |window, cx| {
+                        window.failed = match &result {
+                            Ok(()) => {
+                                log::info!("shell integration: the scripts are written again");
+                                None
+                            }
+                            Err(error) => Some(format!("{error:#}").into()),
+                        };
+                        cx.notify();
+                    });
+                }
+            });
+        let integration = SettingsRow::new("Shell integration")
+            .description(cx.global::<ShellIntegration>().0.display().to_string())
+            .control(repair);
         let mut section = SettingsSection::new(language::message(cx, "settings.terminal.section"))
             .row(
                 SettingsRow::new(language::message(cx, "settings.terminal.shell"))
                     .description(found)
                     .control(shell),
             )
+            .row(integration)
             .row(SettingsRow::new(language::message(cx, "settings.terminal.start")).control(start))
             .row(
                 SettingsRow::new(language::message(cx, "settings.terminal.start.folder"))

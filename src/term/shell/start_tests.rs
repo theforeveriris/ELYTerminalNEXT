@@ -1,4 +1,4 @@
-use std::{env, path::PathBuf};
+use std::{env, fs, path::PathBuf};
 
 use super::{launch_found, scan};
 
@@ -14,6 +14,23 @@ fn found(family: scan::Family, program: &str) -> scan::Found {
         scan::Source::Known,
         scan::Confidence::Certain,
     )
+}
+
+#[test]
+fn a_repair_writes_every_script_again() {
+    let root = folder();
+    let dir = root.join("integration");
+    super::install(&dir).expect("the scripts install");
+    let script = dir.join("bash").join("elyterminal.bash");
+    assert!(script.is_file());
+    fs::write(&script, "tampered").expect("a tampered script");
+    super::repair(&dir).expect("the scripts repair");
+    let text = fs::read_to_string(&script).expect("the script");
+    assert!(!text.is_empty() && text != "tampered");
+    super::remove(&dir).expect("the scripts go");
+    assert!(!dir.exists());
+    super::remove(&dir).expect("removing what is gone is fine");
+    fs::remove_dir_all(&root).expect("cleanup");
 }
 
 #[test]
