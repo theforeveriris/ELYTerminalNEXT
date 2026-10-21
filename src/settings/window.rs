@@ -25,6 +25,7 @@ mod appearance;
 mod custom;
 mod general;
 mod terminal;
+mod theme_import;
 mod themegrid;
 
 actions!(elyterminal, [OpenSettings, CloseSettings]);

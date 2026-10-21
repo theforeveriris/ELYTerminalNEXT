@@ -246,3 +246,45 @@ fn decomposed_names_on_disk_wear_the_composed_marks_git_writes() {
     );
     assert_eq!(files.folder(&root, "r".into(), false), expected);
 }
+
+/// A command as its program and its arguments in text.
+fn shown(command: (String, Vec<OsString>)) -> (String, Vec<String>) {
+    (
+        command.0,
+        command
+            .1
+            .into_iter()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect(),
+    )
+}
+
+#[test]
+fn each_platform_shows_a_file_or_a_folder_its_own_way() {
+    let file = Path::new("/a/b.txt");
+    let folder = Path::new("/a/b");
+    assert_eq!(
+        reveal_command(file, false, "windows").map(shown),
+        Some(("explorer".into(), vec!["/select,/a/b.txt".into()]))
+    );
+    assert_eq!(
+        reveal_command(folder, true, "windows").map(shown),
+        Some(("explorer".into(), vec!["/a/b".into()]))
+    );
+    assert_eq!(
+        reveal_command(file, false, "macos").map(shown),
+        Some(("open".into(), vec!["-R".into(), "/a/b.txt".into()]))
+    );
+    assert_eq!(
+        reveal_command(folder, true, "macos").map(shown),
+        Some(("open".into(), vec!["/a/b".into()]))
+    );
+    assert_eq!(
+        reveal_command(file, false, "linux").map(shown),
+        Some(("xdg-open".into(), vec!["/a".into()]))
+    );
+    assert_eq!(
+        reveal_command(folder, true, "linux").map(shown),
+        Some(("xdg-open".into(), vec!["/a/b".into()]))
+    );
+}

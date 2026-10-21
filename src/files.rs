@@ -4,14 +4,19 @@ use std::{
     ffi::OsString,
     fs, io,
     path::{Path, PathBuf},
+    process::Command,
 };
 
 use ely_gpui_component::{
+    buttons::IconButton,
     data_display::Tone,
     lists::{GitStatus, Tree, TreeNode},
     primitives::IconName,
 };
-use gpui::{AppContext, Context, IntoElement, Render, SharedString, Styled, Task, Window};
+use gpui::{
+    AppContext, ClipboardItem, Context, IntoElement, ParentElement, Render, SharedString, Styled,
+    Task, Window, div,
+};
 
 use crate::{git, sessions};
 
@@ -118,6 +123,8 @@ pub struct Files {
     marks: HashMap<PathBuf, GitStatus>,
     /// Folders holding a mark.
     dirty: HashSet<PathBuf>,
+    /// The file or folder the tree selected.
+    selected: Option<PathBuf>,
     reading: Task<()>,
     checking: Task<()>,
 }
@@ -131,6 +138,7 @@ impl Files {
             listings: HashMap::new(),
             marks: HashMap::new(),
             dirty: HashSet::new(),
+            selected: None,
             reading: Task::ready(()),
             checking: Task::ready(()),
         }
@@ -267,12 +275,45 @@ impl Render for Files {
             }
             _ => sessions::shown(&self.root, home.as_deref()),
         };
-        let (load, open) = (cx.entity(), cx.entity());
-        Tree::new(
+        let (load, open, selecting) = (cx.entity(), cx.entity(), cx.entity());
+        let selected: Vec<SharedString> = self.selected.iter().map(|path| key(path)).collect();
+        let chosen = self.selected.clone();
+        let copy = IconButton::new("copy-path", IconName::Copy)
+            .tooltip("Copy path")
+            .on_click(move |_, _, cx| {
+                if let Some(path) = &chosen {
+                    cx.write_to_clipboard(ClipboardItem::new_string(path.display().to_string()));
+                    log::info!("files: copied {}", path.display());
+                }
+            });
+        let chosen = self.selected.clone();
+        let reveal = IconButton::new("reveal-path", IconName::FolderOpen)
+            .tooltip("Show in the file manager")
+            .on_click(move |_, _, _| {
+                if let Some(path) = &chosen {
+                    show_in_manager(path);
+                }
+            });
+        let toolbar = div()
+            .flex()
+            .items_center()
+            .gap_1()
+            .px_2()
+            .pt_2()
+            .child(copy)
+            .child(reveal);
+        let tree = Tree::new(
             ("files", self.generation),
             [self.folder(&self.root, label, false)],
         )
+        .selected(selected)
         .open([key(&self.root)])
+        .on_select(move |keys, _, cx| {
+            selecting.update(cx, |files, cx| {
+                files.selected = keys.first().and_then(|key| files.path(key));
+                cx.notify();
+            })
+        })
         .on_load(move |key, _, cx| {
             load.update(cx, |files, cx| match files.path(key) {
                 Some(folder) => files.load(folder, cx),
@@ -286,7 +327,51 @@ impl Render for Files {
             }
             None => log::warn!("files: {key} to open is gone"),
         })
-        .size_full()
+        .size_full();
+        div()
+            .flex()
+            .flex_col()
+            .size_full()
+            .child(toolbar)
+            .child(tree)
+    }
+}
+
+/// Opens the file manager on `path`, selecting a file and opening a folder.
+fn show_in_manager(path: &Path) {
+    let Some((program, args)) = reveal_command(path, path.is_dir(), std::env::consts::OS) else {
+        log::warn!("files: no file manager for {}", path.display());
+        return;
+    };
+    match Command::new(&program).args(args).spawn() {
+        Ok(_) => log::info!("files: {program} shows {}", path.display()),
+        Err(error) => log::error!("files: {program} cannot show {}: {error}", path.display()),
+    }
+}
+
+/// The program and arguments that show `path` in `os`'s file manager.
+pub fn reveal_command(path: &Path, folder: bool, os: &str) -> Option<(String, Vec<OsString>)> {
+    match os {
+        "windows" => Some((
+            "explorer".into(),
+            vec![if folder {
+                path.as_os_str().to_owned()
+            } else {
+                OsString::from(format!("/select,{}", path.display()))
+            }],
+        )),
+        "macos" => {
+            let mut args = Vec::new();
+            if !folder {
+                args.push(OsString::from("-R"));
+            }
+            args.push(path.as_os_str().to_owned());
+            Some(("open".into(), args))
+        }
+        _ => {
+            let shown = if folder { path } else { path.parent()? };
+            Some(("xdg-open".into(), vec![shown.as_os_str().to_owned()]))
+        }
     }
 }
 
