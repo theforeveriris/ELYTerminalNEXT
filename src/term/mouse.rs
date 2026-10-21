@@ -1,4 +1,4 @@
-/// A button as reports name it; the wheel's two turns count as buttons.
+/// A button as reports name it; the wheel's turns count as buttons.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Button {
     Left,
@@ -6,6 +6,8 @@ pub enum Button {
     Right,
     WheelUp,
     WheelDown,
+    WheelLeft,
+    WheelRight,
 }
 
 /// What the mouse did.
@@ -24,6 +26,8 @@ pub struct Report {
     pub gesture: Gesture,
     /// Column and row on screen, from 0.
     pub cell: (usize, usize),
+    /// Where the pointer is in pixels from the grid's top-left; mode 1016 reports these.
+    pub pixel: (usize, usize),
     pub shift: bool,
     pub alt: bool,
     pub ctrl: bool,
@@ -44,13 +48,17 @@ pub enum Tracking {
     Any,
 }
 
-/// The bytes reports go in: xterm's default, mode 1005 or mode 1006.
+/// The bytes reports go in: xterm's default, mode 1005, 1006, 1015 or 1016.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Format {
     #[default]
     X10,
     Utf8,
     Sgr,
+    /// urxvt's `CSI Cb;Cx;Cy M`, which names the released button.
+    Urxvt,
+    /// SGR with pixels instead of cells.
+    SgrPixels,
 }
 
 /// How a program asked for the mouse.
@@ -68,11 +76,13 @@ impl MouseMode {
             1000 => Tracking::Normal,
             1002 => Tracking::Button,
             1003 => Tracking::Any,
-            1005 | 1006 => {
+            1005 | 1006 | 1015 | 1016 => {
                 self.format = match (set, mode) {
                     (false, _) => Format::X10,
                     (true, 1005) => Format::Utf8,
-                    (true, _) => Format::Sgr,
+                    (true, 1006) => Format::Sgr,
+                    (true, 1015) => Format::Urxvt,
+                    (true, _) => Format::SgrPixels,
                 };
                 return;
             }
@@ -98,7 +108,7 @@ pub fn encode(report: &Report, mode: MouseMode) -> Option<Vec<u8>> {
     if !wanted {
         return None;
     }
-    let sgr = mode.format == Format::Sgr;
+    let sgr = matches!(mode.format, Format::Sgr | Format::SgrPixels);
     let mut code = match report.button {
         None => 3,
         Some(_) if report.gesture == Gesture::Release && !sgr => 3,
@@ -107,6 +117,8 @@ pub fn encode(report: &Report, mode: MouseMode) -> Option<Vec<u8>> {
         Some(Button::Right) => 2,
         Some(Button::WheelUp) => 64,
         Some(Button::WheelDown) => 65,
+        Some(Button::WheelLeft) => 66,
+        Some(Button::WheelRight) => 67,
     };
     if mode.tracking != Tracking::X10 {
         code +=
@@ -122,7 +134,14 @@ pub fn encode(report: &Report, mode: MouseMode) -> Option<Vec<u8>> {
         } else {
             'M'
         };
-        return Some(format!("\x1b[<{code};{column};{row}{end}").into_bytes());
+        let (x, y) = match mode.format {
+            Format::SgrPixels => (report.pixel.0 + 1, report.pixel.1 + 1),
+            _ => (column, row),
+        };
+        return Some(format!("\x1b[<{code};{x};{y}{end}").into_bytes());
+    }
+    if mode.format == Format::Urxvt {
+        return Some(format!("\x1b[{code};{column};{row}M").into_bytes());
     }
     let utf8 = mode.format == Format::Utf8;
     let most = if utf8 { 0x7FF - 32 } else { 0xFF - 32 };
@@ -153,6 +172,7 @@ mod tests {
             button,
             gesture,
             cell,
+            pixel: (cell.0 * 8, cell.1 * 16),
             shift: false,
             alt: false,
             ctrl: false,
@@ -240,6 +260,51 @@ mod tests {
         let wheel = report(Some(Button::WheelUp), Gesture::Press, (0, 0));
         assert_eq!(encode(&wheel, x10), None);
         assert_eq!(encode(&press, MouseMode::default()), None);
+    }
+
+    #[test]
+    fn urxvt_names_cells_and_the_released_button() {
+        let urxvt = mode(Tracking::Normal, Format::Urxvt);
+        let press = report(LEFT, Gesture::Press, (0, 0));
+        assert_eq!(encode(&press, urxvt), Some(b"\x1b[0;1;1M".to_vec()));
+        let release = report(LEFT, Gesture::Release, (3, 2));
+        assert_eq!(encode(&release, urxvt), Some(b"\x1b[3;4;3M".to_vec()));
+        let shifted = Report {
+            shift: true,
+            ..report(Some(Button::Right), Gesture::Press, (9, 4))
+        };
+        assert_eq!(
+            encode(&shifted, urxvt),
+            Some(b"\x1b[6;10;5M".to_vec()),
+            "the button is named, with its modifiers"
+        );
+    }
+
+    #[test]
+    fn sgr_pixels_reports_pixels_and_the_sideways_wheel() {
+        let pixels = mode(Tracking::Normal, Format::SgrPixels);
+        let mut press = report(LEFT, Gesture::Press, (4, 2));
+        press.pixel = (37, 23);
+        assert_eq!(encode(&press, pixels), Some(b"\x1b[<0;38;24M".to_vec()));
+        let left = report(Some(Button::WheelLeft), Gesture::Press, (0, 0));
+        assert_eq!(encode(&left, pixels), Some(b"\x1b[<66;1;1M".to_vec()));
+        let right = report(Some(Button::WheelRight), Gesture::Press, (0, 0));
+        assert_eq!(encode(&right, pixels), Some(b"\x1b[<67;1;1M".to_vec()));
+        let release = report(LEFT, Gesture::Release, (0, 0));
+        assert_eq!(encode(&release, pixels), Some(b"\x1b[<0;1;1m".to_vec()));
+    }
+
+    #[test]
+    fn modes_1015_and_1016_choose_their_formats() {
+        let mut held = MouseMode::default();
+        held.apply(1015, true);
+        assert_eq!(held.format, Format::Urxvt);
+        held.apply(1016, true);
+        assert_eq!(held.format, Format::SgrPixels);
+        held.apply(1016, false);
+        assert_eq!(held.format, Format::X10);
+        held.apply(1006, true);
+        assert_eq!(held.format, Format::Sgr);
     }
 
     #[test]

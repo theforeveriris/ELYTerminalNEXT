@@ -34,8 +34,12 @@ pub struct Pointer {
     pressed: Vec<Button>,
     /// The cell of the last report; motion inside it sends nothing.
     last: Option<(usize, usize)>,
+    /// Where the pointer is in pixels from the grid's top-left, for mode 1016.
+    pixel: (usize, usize),
     /// Wheel travel short of a line.
     rest: Pixels,
+    /// Wheel travel short of a line, sideways.
+    rest_x: Pixels,
 }
 
 fn button(button: MouseButton) -> Option<Button> {
@@ -65,6 +69,15 @@ impl TerminalView {
         ((column, row), point, side)
     }
 
+    /// Where a window position is in pixels from the grid's top-left, clamped at zero.
+    fn pixel_at(&self, position: Point<Pixels>) -> (usize, usize) {
+        let origin = self.pointer.origin;
+        (
+            f32::from(position.x - origin.x).max(0.).round() as usize,
+            f32::from(position.y - origin.y).max(0.).round() as usize,
+        )
+    }
+
     /// What the program tracks; none while Shift holds the mouse for selecting.
     fn tracking(&self, modifiers: &Modifiers) -> Tracking {
         if modifiers.shift {
@@ -89,6 +102,7 @@ impl TerminalView {
             button,
             gesture,
             cell,
+            pixel: self.pointer.pixel,
             shift: modifiers.shift,
             alt: modifiers.alt,
             ctrl: modifiers.control || link,
@@ -111,6 +125,7 @@ impl TerminalView {
     ) {
         window.focus(&self.focus, cx);
         let (cell, point, side) = self.cell_at(event.position);
+        self.pointer.pixel = self.pixel_at(event.position);
         let opens = if cfg!(target_os = "macos") {
             event.modifiers.platform
         } else {
@@ -186,6 +201,7 @@ impl TerminalView {
         cx: &mut Context<Self>,
     ) {
         let (cell, point, side) = self.cell_at(event.position);
+        self.pointer.pixel = self.pixel_at(event.position);
         if self.pointer.selecting && event.pressed_button == Some(MouseButton::Left) {
             if self.pointer.click.is_some_and(|click| click != point) {
                 self.pointer.click = None;
@@ -212,6 +228,7 @@ impl TerminalView {
         _: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        self.pointer.pixel = self.pixel_at(event.position);
         if event.button == MouseButton::Left {
             self.end_selection(cx);
             let (_, point, _) = self.cell_at(event.position);
@@ -275,44 +292,73 @@ impl TerminalView {
         _: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let height = self.pointer.cell.height;
+        let (width, height) = (self.pointer.cell.width, self.pointer.cell.height);
         if height <= Pixels::ZERO {
             return;
         }
         cx.stop_propagation();
-        self.pointer.rest += match event.delta {
-            ScrollDelta::Pixels(delta) => delta.y,
-            ScrollDelta::Lines(delta) => height * delta.y * NOTCH,
+        self.pointer.pixel = self.pixel_at(event.position);
+        let (dx, dy) = match event.delta {
+            ScrollDelta::Pixels(delta) => (delta.x, delta.y),
+            ScrollDelta::Lines(delta) => (width * delta.x * NOTCH, height * delta.y * NOTCH),
         };
+        self.pointer.rest += dy;
+        self.pointer.rest_x += dx;
         let lines = (self.pointer.rest / height).trunc() as i32;
-        if lines == 0 {
+        let turns = if width > Pixels::ZERO {
+            (self.pointer.rest_x / width).trunc() as i32
+        } else {
+            0
+        };
+        if lines == 0 && turns == 0 {
             return;
         }
         self.pointer.rest -= height * lines as f32;
-        log::trace!("terminal {}: wheel {lines} lines", self.pty.pid);
+        self.pointer.rest_x -= width * turns as f32;
+        log::trace!(
+            "terminal {}: wheel {lines} lines, {turns} sideways",
+            self.pty.pid
+        );
         let (cell, ..) = self.cell_at(event.position);
         let tracking = self.tracking(&event.modifiers);
         let mode = *self.pty.term.lock().mode();
         if tracking != Tracking::Off {
-            let turn = if lines > 0 {
-                Button::WheelUp
-            } else {
-                Button::WheelDown
-            };
-            for _ in 0..lines.unsigned_abs() {
-                self.report(Some(turn), Gesture::Press, cell, &event.modifiers, tracking);
+            if turns != 0 {
+                let turn = if turns > 0 {
+                    Button::WheelRight
+                } else {
+                    Button::WheelLeft
+                };
+                for _ in 0..turns.unsigned_abs() {
+                    self.report(Some(turn), Gesture::Press, cell, &event.modifiers, tracking);
+                }
             }
-        } else if mode.contains(TermMode::ALT_SCREEN | TermMode::ALTERNATE_SCROLL) {
-            let arrow: &[u8] = match (lines > 0, mode.contains(TermMode::APP_CURSOR)) {
-                (true, true) => b"\x1bOA",
-                (true, false) => b"\x1b[A",
-                (false, true) => b"\x1bOB",
-                (false, false) => b"\x1b[B",
-            };
-            self.pty.write(arrow.repeat(lines.unsigned_abs() as usize));
+            if lines != 0 {
+                let turn = if lines > 0 {
+                    Button::WheelUp
+                } else {
+                    Button::WheelDown
+                };
+                for _ in 0..lines.unsigned_abs() {
+                    self.report(Some(turn), Gesture::Press, cell, &event.modifiers, tracking);
+                }
+            }
         } else {
-            self.pty.term.lock().scroll_display(Scroll::Delta(lines));
-            cx.notify();
+            if lines == 0 {
+                return;
+            }
+            if mode.contains(TermMode::ALT_SCREEN | TermMode::ALTERNATE_SCROLL) {
+                let arrow: &[u8] = match (lines > 0, mode.contains(TermMode::APP_CURSOR)) {
+                    (true, true) => b"\x1bOA",
+                    (true, false) => b"\x1b[A",
+                    (false, true) => b"\x1bOB",
+                    (false, false) => b"\x1b[B",
+                };
+                self.pty.write(arrow.repeat(lines.unsigned_abs() as usize));
+            } else {
+                self.pty.term.lock().scroll_display(Scroll::Delta(lines));
+                cx.notify();
+            }
         }
     }
 
