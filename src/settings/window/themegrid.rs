@@ -13,7 +13,7 @@ use crate::{settings::Settings, themes};
 /// Omarchy's theme where followed, then every built-in, as cards; `dark` picks the dark system's.
 pub(super) fn grid(
     this: &Entity<SettingsWindow>,
-    title: Option<&'static str>,
+    title: Option<String>,
     dark: bool,
     settings: &Settings,
     window: &Window,

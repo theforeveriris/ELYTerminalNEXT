@@ -17,7 +17,8 @@ use gpui::{
 };
 
 use super::{Settings, SettingsStore};
-use crate::{app::APP_ID, menus, term::BLINK, updates::Updates};
+use crate::settings::CursorStyle;
+use crate::{app::APP_ID, menus, settings::language, term::BLINK, updates::Updates};
 
 mod appearance;
 mod custom;
@@ -30,11 +31,11 @@ actions!(elyterminal, [OpenSettings, CloseSettings]);
 /// The key context of the settings window's content.
 const CONTEXT: &str = "Settings";
 
-/// Each category's key, name and icon.
-const SECTIONS: [(&str, &str, IconName); 3] = [
-    ("appearance", "Appearance", IconName::Palette),
-    ("terminal", "Terminal", IconName::Terminal),
-    ("general", "General", IconName::Settings),
+/// Each category's key and its icon; the name comes from the catalog.
+const SECTIONS: [(&str, IconName); 3] = [
+    ("appearance", IconName::Palette),
+    ("terminal", IconName::Terminal),
+    ("general", IconName::Settings),
 ];
 
 /// Cmd-, opens the settings, Cmd-W closes them; off macOS Ctrl-, and Ctrl-Shift-W, as Ghostty's.
@@ -66,10 +67,11 @@ fn open_window(cx: &mut App) {
         return;
     }
     let bounds = Bounds::centered(None, size(px(900.0), px(640.0)), cx);
+    let title = language::message(cx, "settings.window");
     let options = WindowOptions {
         window_bounds: Some(WindowBounds::Windowed(bounds)),
         titlebar: Some(TitlebarOptions {
-            title: Some("Settings".into()),
+            title: Some(title.into()),
             appears_transparent: true,
             traffic_light_position: Some(cx.theme().traffic_light_origin()),
         }),
@@ -115,12 +117,16 @@ pub struct SettingsWindow {
 impl SettingsWindow {
     fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let shell = cx.new(|cx| {
-            let mut input = TextInput::new(window, cx).placeholder("Login shell");
+            let mut input = TextInput::new(window, cx)
+                .placeholder(language::message(cx, "settings.terminal.shell.hint"));
             input.set_text(SettingsStore::get(cx).shell.clone(), cx);
             input
         });
         let font = cx.new(|cx| TextInput::new(window, cx));
-        let search = cx.new(|cx| TextInput::new(window, cx).placeholder("Search shortcuts"));
+        let search = cx.new(|cx| {
+            TextInput::new(window, cx)
+                .placeholder(language::message(cx, "settings.terminal.search"))
+        });
         let typed = cx.subscribe(&shell, |this, input, event: &InputEvent, cx| {
             if let InputEvent::Changed = event {
                 let shell = input.read(cx).text().to_string();
@@ -189,8 +195,9 @@ fn sections(open: &SharedString, cx: &Context<SettingsWindow>) -> SelectableList
     let muted = cx.theme().colors.fg_muted;
     let list = SECTIONS.iter().fold(
         SelectableList::new("settings-section-list").selected([open.clone()]),
-        |list, (key, name, icon)| {
-            let item = ListItem::new(SharedString::from(format!("settings-section-{key}")), *name)
+        |list, (key, icon)| {
+            let name = language::message(cx, &format!("settings.category.{key}"));
+            let item = ListItem::new(SharedString::from(format!("settings-section-{key}")), name)
                 .leading(Icon::new(*icon).size(IconSize::Sm).color(muted));
             list.row(*key, item)
         },
@@ -229,11 +236,43 @@ fn switch(
     })
 }
 
+/// The cursor's style, in the language the interface is in.
+fn cursor_style(this: &Entity<SettingsWindow>, now: CursorStyle, cx: &App) -> SegmentedControl {
+    choice(
+        this,
+        "cursor_style",
+        &[
+            (
+                CursorStyle::Block,
+                "block",
+                language::message(cx, "settings.cursor.block"),
+            ),
+            (
+                CursorStyle::Bar,
+                "bar",
+                language::message(cx, "settings.cursor.bar"),
+            ),
+            (
+                CursorStyle::Underline,
+                "underline",
+                language::message(cx, "settings.cursor.underline"),
+            ),
+            (
+                CursorStyle::Hollow,
+                "hollow",
+                language::message(cx, "settings.cursor.hollow"),
+            ),
+        ],
+        now,
+        |settings, style| settings.cursor_style = style,
+    )
+}
+
 /// Segments for `choices`, each a value, its key and its name, that save the chosen value through `put`.
 fn choice<T: Copy + PartialEq + Debug + 'static>(
     this: &Entity<SettingsWindow>,
     field: &'static str,
-    choices: &'static [(T, &'static str, &'static str)],
+    choices: &[(T, &'static str, String)],
     now: T,
     put: fn(&mut Settings, T),
 ) -> SegmentedControl {
@@ -242,23 +281,22 @@ fn choice<T: Copy + PartialEq + Debug + 'static>(
         .find(|(each, ..)| *each == now)
         .expect("every choice is offered");
     let this = this.clone();
-    choices
-        .iter()
-        .fold(
-            SegmentedControl::new(field, *key),
-            |control, (_, key, name)| control.segment(*key, *name, None),
-        )
-        .size(ControlSize::Sm)
-        .on_change(move |key, _, cx| {
-            let (value, ..) = choices
-                .iter()
-                .find(|(_, each, _)| *each == key.as_ref())
-                .expect("a choice the control offers");
-            let value = *value;
-            set(&this, format!("{field} is {value:?}"), cx, |settings| {
-                put(settings, value)
-            });
-        })
+    let mut control = SegmentedControl::new(field, *key);
+    for (_, key, name) in choices {
+        control = control.segment(*key, name.clone(), None);
+    }
+    // The choices move into the handler, which outlives this call.
+    let owned: Vec<(T, &'static str, String)> = choices.to_vec();
+    control.size(ControlSize::Sm).on_change(move |key, _, cx| {
+        let (value, ..) = owned
+            .iter()
+            .find(|(_, each, _)| *each == key.as_ref())
+            .expect("a choice the control offers");
+        let value = *value;
+        set(&this, format!("{field} is {value:?}"), cx, |settings| {
+            put(settings, value)
+        });
+    })
 }
 
 /// Saves one change and logs it, telling whether the settings hold it; a refused one changes nothing, and the window says why.
@@ -309,10 +347,11 @@ impl Render for SettingsWindow {
             .gap_4()
             .children((self.failed.clone()).map(|why| InlineMessage::new(Severity::Danger, why)))
             .child(page);
-        let (_, name, _) = SECTIONS
+        let (key, _) = SECTIONS
             .iter()
             .find(|(key, ..)| *key == self.section.as_ref())
             .expect("the open section is listed");
+        let name = language::message(cx, &format!("settings.category.{key}"));
         let list = div()
             .id("settings-list")
             .size_full()
@@ -330,10 +369,10 @@ impl Render for SettingsWindow {
             .column(
                 ShellColumn::new("settings-sections")
                     .width(cx.theme().label_width() * 1.25)
-                    .title("Settings")
+                    .title(language::message(cx, "settings.window"))
                     .child(list),
             )
-            .column(ShellColumn::new("settings-page").title(*name).child(body));
+            .column(ShellColumn::new("settings-page").title(name).child(body));
         // The context sits above the focus root, so its keys work wherever focus is.
         div()
             .size_full()

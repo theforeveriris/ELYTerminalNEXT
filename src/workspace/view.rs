@@ -23,7 +23,7 @@ use super::{
 use crate::menus;
 use crate::sessions::{self, Session};
 use crate::settings::window::OpenSettings;
-use crate::settings::{PanelTab, Settings, SettingsStore};
+use crate::settings::{PanelTab, Settings, SettingsStore, language};
 use crate::workspace::TITLE;
 
 /// Shows Git or Files in the right column, as the settings keep it.
@@ -89,7 +89,7 @@ impl Workspace {
                     IconButton::new(("close-tab", at), IconName::X)
                         .variant(ButtonVariant::Ghost)
                         .size(ControlSize::Sm)
-                        .tooltip("Close tab")
+                        .tooltip(language::message(cx, "workspace.close_tab"))
                         .on_click(move |_, window, cx| {
                             cx.stop_propagation();
                             close.update(cx, |this, cx| this.close_tab_at(at, window, cx))
@@ -204,7 +204,7 @@ impl Render for Workspace {
             let new = IconButton::new("new-tab", IconName::Plus)
                 .variant(ButtonVariant::Ghost)
                 .size(ControlSize::Sm)
-                .tooltip("New tab")
+                .tooltip(language::message(cx, "workspace.new_tab"))
                 .on_click(move |_, window, cx| {
                     adder.update(cx, |this, cx| this.new_tab(window, cx))
                 });
@@ -212,7 +212,7 @@ impl Render for Workspace {
             let split = IconButton::new("split-pane", IconName::PanelRight)
                 .variant(ButtonVariant::Ghost)
                 .size(ControlSize::Sm)
-                .tooltip("Split the pane")
+                .tooltip(language::message(cx, "workspace.split"))
                 .on_click(move |_, window, cx| {
                     splitter.update(cx, |this, cx| this.split(true, window, cx))
                 });
@@ -233,14 +233,18 @@ impl Render for Workspace {
                 PanelTab::Files => "files",
             };
             let switch = SegmentedControl::new("panel-tab", chosen)
-                .segment("git", "Git", None)
-                .segment("files", "Files", None)
+                .segment("git", language::message(cx, "workspace.git"), None)
+                .segment("files", language::message(cx, "workspace.files"), None)
                 .size(ControlSize::Sm)
                 .on_change(|value, _, cx| show_tab(value, cx));
             let quiet = self
                 .session(self.active)
                 .is_some_and(|session| !session.reports);
-            let caption = || Caption::new("This shell reports no folder.").px_3().pt_2();
+            let caption = || {
+                Caption::new(language::message(cx, "workspace.no_folder"))
+                    .px_3()
+                    .pt_2()
+            };
             // Hidden, not dropped, so each keeps its state.
             let body = |on: bool| {
                 div()

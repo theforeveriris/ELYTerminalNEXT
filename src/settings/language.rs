@@ -34,23 +34,6 @@ impl Language {
     pub fn resolved(self) -> &'static str {
         self.tag().unwrap_or_else(system_tag)
     }
-
-    /// The name of the language, in that language.
-    pub fn name(self) -> &'static str {
-        match self {
-            Language::System => "System",
-            Language::English => "English",
-            Language::Chinese => "中文",
-        }
-    }
-
-    /// The name of the language, in the language the interface is in.
-    pub fn named(self, cx: &App) -> String {
-        match self {
-            Language::System => text(cx, "settings.language.system", &[]).to_string(),
-            _ => self.name().to_string(),
-        }
-    }
 }
 
 /// The language the system speaks, as a tag Ely knows.
@@ -70,28 +53,169 @@ fn speaks(tag: &str) -> bool {
     };
     let locale = locale.to_lowercase();
     let wanted = tag.to_lowercase();
-    locale.starts_with(&wanted[..wanted.find('-').unwrap_or(wanted.len())])
+    let name = wanted.split('-').next().unwrap_or(&wanted);
+    locale.starts_with(name)
 }
 
 /// The messages of each language, keyed by the English text they stand for.
 const EN: &[(&str, &str)] = &[
-    ("settings.language.system", "System"),
+    // The categories and the window.
+    ("settings.window", "Settings"),
+    ("settings.category.appearance", "Appearance"),
+    ("settings.category.terminal", "Terminal"),
+    ("settings.category.general", "General"),
+    // The general page.
+    ("settings.language.section", "Language"),
     ("settings.language.label", "Language"),
     (
         "settings.language.description",
         "The language of the interface",
     ),
+    ("settings.language.system", "System"),
+    // The appearance page.
+    ("settings.theme.section", "Theme"),
+    ("settings.theme.separate", "Separate dark theme"),
+    ("settings.theme.light", "Light"),
+    ("settings.theme.dark", "Dark"),
+    ("settings.font.section", "Font"),
+    ("settings.font.family", "Family"),
+    ("settings.font.fallbacks", "Fallbacks"),
+    (
+        "settings.font.fallbacks.hint",
+        "Tried in order for characters the family lacks",
+    ),
+    ("settings.font.size", "Size"),
+    ("settings.font.height", "Line height"),
+    ("settings.font.ligatures", "Ligatures"),
+    ("settings.font.add", "Add fallback"),
+    ("settings.font.remove", "Remove"),
+    ("settings.cursor.section", "Cursor"),
+    ("settings.cursor.style", "Style"),
+    ("settings.cursor.blink", "Blink"),
+    ("settings.cursor.preview", "Preview"),
+    ("settings.cursor.block", "Block"),
+    ("settings.cursor.bar", "Bar"),
+    ("settings.cursor.underline", "Underline"),
+    ("settings.cursor.hollow", "Hollow"),
+    ("settings.window.section", "Window"),
+    ("settings.window.opacity", "Background opacity"),
+    ("settings.window.blur", "Background blur"),
+    ("settings.window.padding_x", "Horizontal padding"),
+    ("settings.window.padding_y", "Vertical padding"),
+    ("settings.window.custom", "Custom theme"),
+    ("settings.window.cancel", "Cancel"),
+    // The terminal page.
+    ("settings.terminal.section", "Terminal"),
+    ("settings.terminal.shell", "Shell"),
+    ("settings.terminal.shell.hint", "Login shell"),
+    ("settings.terminal.start", "Start in"),
+    ("settings.terminal.start.home", "Home"),
+    ("settings.terminal.start.session", "The session's folder"),
+    ("settings.terminal.scrollback", "Scrollback lines"),
+    ("settings.terminal.option", "Option as Alt"),
+    ("settings.terminal.option.off", "Off"),
+    ("settings.terminal.option.left", "Left"),
+    ("settings.terminal.option.right", "Right"),
+    ("settings.terminal.option.both", "Both"),
+    ("settings.terminal.copy", "Copy on select"),
+    ("settings.terminal.ely", "Ely"),
+    (
+        "settings.terminal.updates",
+        "Check for updates automatically",
+    ),
+    ("settings.terminal.updates.now", "Check now"),
+    ("settings.terminal.updates.found", "The last check found"),
+    ("settings.terminal.shortcuts", "Shortcuts"),
+    ("settings.terminal.search", "Search shortcuts"),
+    // The workspace.
+    ("workspace.new_tab", "New tab"),
+    ("workspace.close_tab", "Close tab"),
+    ("workspace.split", "Split the pane"),
+    ("workspace.new_session", "New session"),
+    ("workspace.close_session", "Close session"),
+    ("workspace.no_folder", "This shell reports no folder."),
+    ("workspace.git", "Git"),
+    ("workspace.files", "Files"),
 ];
 
 const ZH: &[(&str, &str)] = &[
-    ("settings.language.system", "跟随系统"),
+    ("settings.window", "设置"),
+    ("settings.category.appearance", "外观"),
+    ("settings.category.terminal", "终端"),
+    ("settings.category.general", "通用"),
+    ("settings.language.section", "语言"),
     ("settings.language.label", "语言"),
     ("settings.language.description", "界面使用的语言"),
+    ("settings.language.system", "跟随系统"),
+    ("settings.theme.section", "主题"),
+    ("settings.theme.separate", "单独的深色主题"),
+    ("settings.theme.light", "浅色"),
+    ("settings.theme.dark", "深色"),
+    ("settings.font.section", "字体"),
+    ("settings.font.family", "字体族"),
+    ("settings.font.fallbacks", "回退字体"),
+    (
+        "settings.font.fallbacks.hint",
+        "主字体族缺失某字符时按顺序尝试",
+    ),
+    ("settings.font.size", "字号"),
+    ("settings.font.height", "行高"),
+    ("settings.font.ligatures", "连字"),
+    ("settings.font.add", "添加回退字体"),
+    ("settings.font.remove", "移除"),
+    ("settings.cursor.section", "光标"),
+    ("settings.cursor.style", "样式"),
+    ("settings.cursor.blink", "闪烁"),
+    ("settings.cursor.preview", "预览"),
+    ("settings.cursor.block", "块状"),
+    ("settings.cursor.bar", "竖线"),
+    ("settings.cursor.underline", "下划线"),
+    ("settings.cursor.hollow", "空心"),
+    ("settings.window.section", "窗口"),
+    ("settings.window.opacity", "背景不透明度"),
+    ("settings.window.blur", "背景模糊"),
+    ("settings.window.padding_x", "水平内边距"),
+    ("settings.window.padding_y", "垂直内边距"),
+    ("settings.window.custom", "自定义主题"),
+    ("settings.window.cancel", "取消"),
+    ("settings.terminal.section", "终端"),
+    ("settings.terminal.shell", "Shell"),
+    ("settings.terminal.shell.hint", "登录 shell"),
+    ("settings.terminal.start", "起始目录"),
+    ("settings.terminal.start.home", "Home"),
+    ("settings.terminal.start.session", "会话所在目录"),
+    ("settings.terminal.scrollback", "回滚行数"),
+    ("settings.terminal.option", "Option 视作 Alt"),
+    ("settings.terminal.option.off", "关闭"),
+    ("settings.terminal.option.left", "左侧"),
+    ("settings.terminal.option.right", "右侧"),
+    ("settings.terminal.option.both", "两侧"),
+    ("settings.terminal.copy", "选中即复制"),
+    ("settings.terminal.ely", "Ely"),
+    ("settings.terminal.updates", "自动检查更新"),
+    ("settings.terminal.updates.now", "立即检查"),
+    ("settings.terminal.updates.found", "上次检查的结果"),
+    ("settings.terminal.shortcuts", "快捷键"),
+    ("settings.terminal.search", "搜索快捷键"),
+    ("workspace.new_tab", "新建标签页"),
+    ("workspace.close_tab", "关闭标签页"),
+    ("workspace.split", "分屏"),
+    ("workspace.new_session", "新建会话"),
+    ("workspace.close_session", "关闭会话"),
+    ("workspace.no_folder", "此 shell 未报告目录。"),
+    ("workspace.git", "Git"),
+    ("workspace.files", "文件"),
 ];
+
+/// The message for `key`, in the language the interface is in.
+pub fn message(cx: &App, key: &str) -> String {
+    text(cx, key, &[]).to_string()
+}
 
 /// Sets the interface's language in every window.
 pub fn apply(language: Language, cx: &mut App) {
     let tag = language.resolved();
+    log::info!("language: the interface speaks {tag}");
     if cx.has_global::<I18n>() {
         I18n::set_locale(tag, cx);
         return;
@@ -111,7 +235,6 @@ mod tests {
 
     #[test]
     fn the_system_language_is_english_unless_it_speaks_chinese() {
-        // The test process carries the CI's locale, which is not Chinese.
         assert!(["en-US", "zh-CN"].contains(&system_tag()));
     }
 
@@ -139,5 +262,37 @@ mod tests {
             keys
         }
         assert_eq!(keys(EN), keys(ZH), "the catalogs hold the same keys");
+    }
+
+    #[test]
+    fn no_message_is_empty_and_none_is_the_same_in_both_languages() {
+        for (key, english) in EN {
+            assert!(!english.is_empty(), "{key} is empty");
+            let chinese = ZH
+                .iter()
+                .find(|(other, _)| other == key)
+                .map(|(_, text)| *text)
+                .expect("the key");
+            assert!(!chinese.is_empty(), "{key} is empty in Chinese");
+        }
+    }
+
+    #[test]
+    fn every_key_the_code_uses_is_in_the_catalog() {
+        // Each key the interface asks for, and the text it stands for.
+        const USED: [&str; 6] = [
+            "settings.window",
+            "settings.category.appearance",
+            "settings.terminal.section",
+            "settings.language.system",
+            "workspace.new_tab",
+            "settings.cursor.block",
+        ];
+        for key in USED {
+            assert!(
+                EN.iter().any(|(other, _)| *other == key),
+                "{key} is not in the catalog"
+            );
+        }
     }
 }

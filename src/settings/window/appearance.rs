@@ -12,19 +12,13 @@ use gpui::{
     px, relative,
 };
 
-use super::{SettingsWindow, choice, set, switch};
+use super::{SettingsWindow, set, switch};
 use crate::{
-    settings::{CursorStyle, FONT_SIZE, LINE_HEIGHT, OPACITY, PADDING, Settings, SettingsStore},
+    settings::{
+        CursorStyle, FONT_SIZE, LINE_HEIGHT, OPACITY, PADDING, Settings, SettingsStore, language,
+    },
     themes::{self, TerminalTheme},
 };
-
-/// Each cursor style, its key and its name.
-const CURSORS: [(CursorStyle, &str, &str); 4] = [
-    (CursorStyle::Block, "block", "Block"),
-    (CursorStyle::Bar, "bar", "Bar"),
-    (CursorStyle::Underline, "underline", "Underline"),
-    (CursorStyle::Hollow, "hollow", "Hollow"),
-];
 
 impl SettingsWindow {
     /// The theme, font, cursor and window rows.
@@ -45,16 +39,16 @@ impl SettingsWindow {
                 );
             }
         });
-        let light = separate.then_some("Light");
-        let mut themes = SettingsSection::new("Theme")
+        let light = separate.then(|| language::message(cx, "settings.theme.light"));
+        let mut themes = SettingsSection::new(language::message(cx, "settings.theme.section"))
             .row(super::themegrid::grid(
                 &this, light, false, settings, window, cx,
             ))
-            .row(SettingsRow::new("Separate dark theme").control(dark));
+            .row(SettingsRow::new(language::message(cx, "settings.theme.separate")).control(dark));
         if separate {
             themes = themes.row(super::themegrid::grid(
                 &this,
-                Some("Dark"),
+                Some(language::message(cx, "settings.theme.dark")),
                 true,
                 settings,
                 window,
@@ -82,52 +76,62 @@ impl SettingsWindow {
                     }
                 }
             });
-        let fallbacks = SettingsRow::new("Fallbacks")
-            .description("Tried in order for characters the family lacks")
+        let fallbacks = SettingsRow::new(language::message(cx, "settings.font.fallbacks"))
+            .description(language::message(cx, "settings.font.fallbacks.hint"))
             .control(self.fallback_list(cx));
-        let font = SettingsSection::new("Font")
-            .row(SettingsRow::new("Family").control(div().w(theme.prose_width()).child(family)))
+        let font = SettingsSection::new(language::message(cx, "settings.font.section"))
+            .row(
+                SettingsRow::new(language::message(cx, "settings.font.family"))
+                    .control(div().w(theme.prose_width()).child(family)),
+            )
             .row(fallbacks)
-            .row(SettingsRow::new("Size").control(self.number(
-                "font_size",
-                settings.font_size,
-                &FONT_SIZE,
-                (1.0, 1),
-                |settings, size| settings.font_size = size,
-                cx,
-            )))
-            .row(SettingsRow::new("Line height").control(self.number(
-                "line_height",
-                settings.line_height,
-                &LINE_HEIGHT,
-                (0.05, 2),
-                |settings, height| settings.line_height = height,
-                cx,
-            )))
-            .row(SettingsRow::new("Ligatures").control(switch(
-                &this,
-                "ligatures",
-                settings.ligatures,
-                |settings, on| settings.ligatures = on,
-            )));
-        let style = choice(
-            &this,
-            "cursor_style",
-            &CURSORS,
-            settings.cursor_style,
-            |settings, style| settings.cursor_style = style,
-        );
+            .row(
+                SettingsRow::new(language::message(cx, "settings.font.size")).control(self.number(
+                    "font_size",
+                    settings.font_size,
+                    &FONT_SIZE,
+                    (1.0, 1),
+                    |settings, size| settings.font_size = size,
+                    cx,
+                )),
+            )
+            .row(
+                SettingsRow::new(language::message(cx, "settings.font.height")).control(
+                    self.number(
+                        "line_height",
+                        settings.line_height,
+                        &LINE_HEIGHT,
+                        (0.05, 2),
+                        |settings, height| settings.line_height = height,
+                        cx,
+                    ),
+                ),
+            )
+            .row(
+                SettingsRow::new(language::message(cx, "settings.font.ligatures")).control(switch(
+                    &this,
+                    "ligatures",
+                    settings.ligatures,
+                    |settings, on| settings.ligatures = on,
+                )),
+            );
+        let style = super::cursor_style(&this, settings.cursor_style, cx);
         let active = themes::active(settings, window.appearance(), cx);
         let lit = self.lit || !settings.cursor_blink;
-        let cursor = SettingsSection::new("Cursor")
-            .row(SettingsRow::new("Style").control(style))
-            .row(SettingsRow::new("Blink").control(switch(
-                &this,
-                "cursor_blink",
-                settings.cursor_blink,
-                |settings, on| settings.cursor_blink = on,
-            )))
-            .row(SettingsRow::new("Preview").control(prompt(settings, &active, lit, cx)));
+        let cursor = SettingsSection::new(language::message(cx, "settings.cursor.section"))
+            .row(SettingsRow::new(language::message(cx, "settings.cursor.style")).control(style))
+            .row(
+                SettingsRow::new(language::message(cx, "settings.cursor.blink")).control(switch(
+                    &this,
+                    "cursor_blink",
+                    settings.cursor_blink,
+                    |settings, on| settings.cursor_blink = on,
+                )),
+            )
+            .row(
+                SettingsRow::new(language::message(cx, "settings.cursor.preview"))
+                    .control(prompt(settings, &active, lit, cx)),
+            );
         let opacity = percent(settings.background_opacity);
         let slider = Slider::new("background_opacity", opacity)
             .range(percent(*OPACITY.start()), percent(*OPACITY.end()))
@@ -153,30 +157,42 @@ impl SettingsWindow {
                     .text_size(theme.text_size(TextSize::Sm))
                     .child(format!("{opacity}%")),
             );
-        let background = SettingsSection::new("Window")
-            .row(SettingsRow::new("Background opacity").control(opacity))
-            .row(SettingsRow::new("Background blur").control(switch(
-                &this,
-                "background_blur",
-                settings.background_blur,
-                |settings, on| settings.background_blur = on,
-            )))
-            .row(SettingsRow::new("Horizontal padding").control(self.number(
-                "padding_x",
-                settings.padding_x,
-                &PADDING,
-                (1.0, 0),
-                |settings, padding| settings.padding_x = padding,
-                cx,
-            )))
-            .row(SettingsRow::new("Vertical padding").control(self.number(
-                "padding_y",
-                settings.padding_y,
-                &PADDING,
-                (1.0, 0),
-                |settings, padding| settings.padding_y = padding,
-                cx,
-            )));
+        let background = SettingsSection::new(language::message(cx, "settings.window.section"))
+            .row(
+                SettingsRow::new(language::message(cx, "settings.window.opacity")).control(opacity),
+            )
+            .row(
+                SettingsRow::new(language::message(cx, "settings.window.blur")).control(switch(
+                    &this,
+                    "background_blur",
+                    settings.background_blur,
+                    |settings, on| settings.background_blur = on,
+                )),
+            )
+            .row(
+                SettingsRow::new(language::message(cx, "settings.window.padding_x")).control(
+                    self.number(
+                        "padding_x",
+                        settings.padding_x,
+                        &PADDING,
+                        (1.0, 0),
+                        |settings, padding| settings.padding_x = padding,
+                        cx,
+                    ),
+                ),
+            )
+            .row(
+                SettingsRow::new(language::message(cx, "settings.window.padding_y")).control(
+                    self.number(
+                        "padding_y",
+                        settings.padding_y,
+                        &PADDING,
+                        (1.0, 0),
+                        |settings, padding| settings.padding_y = padding,
+                        cx,
+                    ),
+                ),
+            );
         // The editor of the user's own colors shows when that theme is worn.
         let custom = (settings.theme == themes::CUSTOM).then(|| self.custom(window, cx));
         div()
@@ -206,9 +222,9 @@ impl SettingsWindow {
         let width = cx.theme().prose_width();
         let row = |index: usize, picker: FontPicker, remove: IconButton| {
             let tip = if index < families.len() {
-                "Remove"
+                language::message(cx, "settings.font.remove")
             } else {
-                "Cancel"
+                language::message(cx, "settings.window.cancel")
             };
             div()
                 .flex()
@@ -255,7 +271,7 @@ impl SettingsWindow {
             });
             row(next, picker, cancel)
         } else {
-            let add = Button::new("add_fallback", "Add fallback")
+            let add = Button::new("add_fallback", language::message(cx, "settings.font.add"))
                 .icon(IconName::Plus)
                 .size(ControlSize::Sm)
                 .on_click({

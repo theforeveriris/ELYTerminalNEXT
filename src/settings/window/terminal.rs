@@ -13,7 +13,7 @@ use gpui::{
 use super::{OpenSettings, SettingsWindow, choice, set, switch};
 use crate::{
     menus::{Bigger, Minimize, Quit, ResetSize, Smaller},
-    settings::{OptionAsAlt, SCROLLBACK, SettingsStore, StartIn},
+    settings::{OptionAsAlt, SCROLLBACK, SettingsStore, StartIn, language},
     term::input::{self, Find, NextPrompt, PreviousPrompt},
     updates::{self, Updates, VERSION},
     workspace::{
@@ -21,14 +21,6 @@ use crate::{
         TogglePanel, ToggleSessions,
     },
 };
-
-/// Each way Option types Alt, its key and its name.
-const OPTIONS: [(OptionAsAlt, &str, &str); 4] = [
-    (OptionAsAlt::Off, "off", "Off"),
-    (OptionAsAlt::Left, "left", "Left"),
-    (OptionAsAlt::Right, "right", "Right"),
-    (OptionAsAlt::Both, "both", "Both"),
-];
 
 /// The names of the sessions a digit shows.
 const PLACES: [&str; 8] = [
@@ -59,8 +51,16 @@ impl SettingsWindow {
             StartIn::Session => "session",
         };
         let start = SegmentedControl::new("settings-start-in", start)
-            .segment("home", "Home", None)
-            .segment("session", "Session's folder", None)
+            .segment(
+                "home",
+                language::message(cx, "settings.terminal.start.home"),
+                None,
+            )
+            .segment(
+                "session",
+                language::message(cx, "settings.terminal.start.session"),
+                None,
+            )
             .size(ControlSize::Sm)
             .on_change({
                 let this = this.clone();
@@ -79,20 +79,46 @@ impl SettingsWindow {
                     });
                 }
             });
-        let mut section = SettingsSection::new("Terminal")
-            .row(SettingsRow::new("Shell").control(shell))
-            .row(SettingsRow::new("Start in").control(start))
-            .row(SettingsRow::new("Scrollback lines").control(lines));
+        let mut section = SettingsSection::new(language::message(cx, "settings.terminal.section"))
+            .row(SettingsRow::new(language::message(cx, "settings.terminal.shell")).control(shell))
+            .row(SettingsRow::new(language::message(cx, "settings.terminal.start")).control(start))
+            .row(
+                SettingsRow::new(language::message(cx, "settings.terminal.scrollback"))
+                    .control(lines),
+            );
         // Off macOS, Alt is always Alt.
         if cfg!(target_os = "macos") {
             let option = choice(
                 &this,
                 "option_as_alt",
-                &OPTIONS,
+                &[
+                    (
+                        OptionAsAlt::Off,
+                        "off",
+                        language::message(cx, "settings.terminal.option.off"),
+                    ),
+                    (
+                        OptionAsAlt::Left,
+                        "left",
+                        language::message(cx, "settings.terminal.option.left"),
+                    ),
+                    (
+                        OptionAsAlt::Right,
+                        "right",
+                        language::message(cx, "settings.terminal.option.right"),
+                    ),
+                    (
+                        OptionAsAlt::Both,
+                        "both",
+                        language::message(cx, "settings.terminal.option.both"),
+                    ),
+                ],
                 settings.option_as_alt,
                 |settings, option| settings.option_as_alt = option,
             );
-            section = section.row(SettingsRow::new("Option as Alt").control(option));
+            section = section.row(
+                SettingsRow::new(language::message(cx, "settings.terminal.option")).control(option),
+            );
         }
         let copy = switch(
             &this,
@@ -102,19 +128,19 @@ impl SettingsWindow {
         );
         let ely = switch(&this, "ely", settings.ely, |settings, on| settings.ely = on);
         let section = section
-            .row(SettingsRow::new("Copy on select").control(copy))
+            .row(SettingsRow::new(language::message(cx, "settings.terminal.copy")).control(copy))
             .row(
-                SettingsRow::new("Ely")
+                SettingsRow::new(language::message(cx, "settings.terminal.ely"))
                     .description("Peeks over the window, her face as your sessions are")
                     .control(ely),
             )
             .row(
-                SettingsRow::new("Check for updates automatically")
+                SettingsRow::new(language::message(cx, "settings.terminal.updates"))
                     .description("At start and once a day")
                     .control(auto_check(&this, settings.check_updates)),
             )
             .row(updates_row(cx));
-        let keys = SettingsSection::new("Shortcuts")
+        let keys = SettingsSection::new(language::message(cx, "settings.terminal.shortcuts"))
             .row(KeyboardShortcutsList::new(shortcuts(cx), &self.search));
         div().flex().flex_col().gap_6().child(section).child(keys)
     }

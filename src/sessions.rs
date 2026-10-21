@@ -136,7 +136,10 @@ pub fn row(
             IconButton::new(("close-session", pid), IconName::X)
                 .variant(ButtonVariant::Ghost)
                 .size(ControlSize::Sm)
-                .tooltip("Close session")
+                .tooltip(crate::settings::language::message(
+                    cx,
+                    "workspace.close_session",
+                ))
                 .on_click(move |_, window, cx| {
                     cx.stop_propagation();
                     close.update(cx, |this, cx| this.close(id, window, cx))
