@@ -2,15 +2,14 @@ use std::ops::RangeInclusive;
 
 use ely_gpui_component::{
     buttons::{Button, ButtonVariant, IconButton},
-    forms::{FontPicker, NumberInput, RadioCard, Slider, Switch, TextInput},
-    layout::SimpleGrid,
+    forms::{FontPicker, NumberInput, Slider, Switch, TextInput},
     primitives::IconName,
     settings::{SettingsRow, SettingsSection},
     theme::{ActiveTheme, ControlSize, Mix, Radius, TextSize},
 };
 use gpui::{
     App, Context, Div, Entity, Hsla, ParentElement, SharedString, Styled, Window, div, prelude::*,
-    px, relative, rems,
+    px, relative,
 };
 
 use super::{SettingsWindow, choice, set, switch};
@@ -48,10 +47,19 @@ impl SettingsWindow {
         });
         let light = separate.then_some("Light");
         let mut themes = SettingsSection::new("Theme")
-            .row(grid(&this, light, false, settings, window, cx))
+            .row(super::themegrid::grid(
+                &this, light, false, settings, window, cx,
+            ))
             .row(SettingsRow::new("Separate dark theme").control(dark));
         if separate {
-            themes = themes.row(grid(&this, Some("Dark"), true, settings, window, cx));
+            themes = themes.row(super::themegrid::grid(
+                &this,
+                Some("Dark"),
+                true,
+                settings,
+                window,
+                cx,
+            ));
         }
         let family = FontPicker::new("font_family", &self.font)
             .selected(settings.font_family.clone())
@@ -169,11 +177,14 @@ impl SettingsWindow {
                 |settings, padding| settings.padding_y = padding,
                 cx,
             )));
+        // The editor of the user's own colors shows when that theme is worn.
+        let custom = (settings.theme == themes::CUSTOM).then(|| self.custom(window, cx));
         div()
             .flex()
             .flex_col()
             .gap_6()
             .child(themes)
+            .children(custom)
             .child(font)
             .child(cursor)
             .child(background)
@@ -349,57 +360,8 @@ fn fraction(percent: f64) -> f32 {
     (percent / 100.) as f32
 }
 
-/// Omarchy's theme where followed, then every built-in, as cards; `dark` picks the dark system's.
-fn grid(
-    this: &Entity<SettingsWindow>,
-    title: Option<&'static str>,
-    dark: bool,
-    settings: &Settings,
-    window: &Window,
-    cx: &App,
-) -> Div {
-    let theme = cx.theme();
-    let (field, chosen) = if dark {
-        ("dark_theme", settings.dark_theme.as_deref())
-    } else {
-        ("theme", Some(settings.theme.as_str()))
-    };
-    let omarchy = cx.try_global::<themes::Omarchy>().map(|omarchy| &omarchy.0);
-    let cards = omarchy.into_iter().chain(themes::all()).map(|each| {
-        let (id, this) = (each.id, this.clone());
-        let key = SharedString::from(format!("{field}-{id}"));
-        RadioCard::new(key, chosen == Some(id), each.name)
-            .preview(preview(each, cx))
-            .on_select(move |_, cx| {
-                set(&this, format!("{field} is {id}"), cx, |settings| {
-                    if dark {
-                        settings.dark_theme = Some(id.into());
-                    } else {
-                        settings.theme = id.into();
-                    }
-                });
-            })
-    });
-    let rem = window.rem_size();
-    let (min, gap) = (
-        theme.label_width().to_pixels(rem),
-        rems(0.75).to_pixels(rem),
-    );
-    div()
-        .flex()
-        .flex_col()
-        .gap_2()
-        .py_3()
-        .border_b_1()
-        .border_color(theme.colors.border)
-        .children(title.map(|title| div().text_size(theme.text_size(TextSize::Sm)).child(title)))
-        .child(
-            SimpleGrid::new(SharedString::from(format!("{field}-grid")), min, gap).children(cards),
-        )
-}
-
 /// A small window in `theme`'s colors: the sessions strip, then a prompt, its output and the cursor.
-fn preview(theme: &TerminalTheme, cx: &App) -> Div {
+pub(super) fn preview(theme: &TerminalTheme, cx: &App) -> Div {
     let (bg, fg) = (theme.background, theme.foreground);
     let bar = |color: Hsla, width: f32| div().h_1().w(relative(width)).rounded_full().bg(color);
     let prompt = |end: Div| {

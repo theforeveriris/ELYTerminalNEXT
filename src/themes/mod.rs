@@ -1,4 +1,5 @@
 mod chrome;
+pub mod custom;
 #[cfg(target_os = "linux")]
 pub mod omarchy;
 
@@ -9,6 +10,7 @@ use ely_gpui_component::theme::Palette;
 use gpui::{App, Global, Hsla, Rgba, WindowAppearance};
 
 pub use chrome::{apply, palette};
+pub use custom::Colors;
 
 use crate::settings::Settings;
 
@@ -33,6 +35,9 @@ impl TerminalTheme {
         self.background.l < 0.5
     }
 }
+
+/// The settings' name for the theme of the user's own colors.
+pub const CUSTOM: &str = "custom";
 
 /// The settings' name for Omarchy's theme, on Linux.
 pub const OMARCHY: &str = "omarchy";
@@ -122,9 +127,9 @@ pub fn find(id: &str) -> Option<&'static TerminalTheme> {
     all().iter().find(|theme| theme.id == id)
 }
 
-/// A theme the settings may name: built in, or Omarchy's on Linux.
+/// A theme the settings may name: built in, the user's own, or Omarchy's on Linux.
 pub fn known(id: &str) -> bool {
-    find(id).is_some() || (cfg!(target_os = "linux") && id == OMARCHY)
+    find(id).is_some() || id == CUSTOM || (cfg!(target_os = "linux") && id == OMARCHY)
 }
 
 /// A fresh install wears Omarchy's theme unless its file is surely absent.
@@ -148,11 +153,30 @@ pub fn chosen(settings: &Settings, appearance: WindowAppearance) -> &str {
     }
 }
 
+/// The theme of the user's own colors, as a terminal theme.
+pub fn custom(colors: &Colors) -> TerminalTheme {
+    TerminalTheme {
+        id: CUSTOM,
+        name: "Custom",
+        background: colors.background,
+        foreground: colors.foreground,
+        cursor: colors.cursor,
+        cursor_text: colors.cursor_text,
+        selection_background: colors.selection_background,
+        selection_foreground: Some(colors.selection_foreground),
+        ansi: colors.ansi(),
+        ely: false,
+    }
+}
+
 /// The chosen theme's colors; Omarchy's come from its global.
 pub fn active(settings: &Settings, appearance: WindowAppearance, cx: &App) -> TerminalTheme {
     let id = chosen(settings, appearance);
     if id == OMARCHY {
         return cx.global::<Omarchy>().0.clone();
+    }
+    if id == CUSTOM {
+        return custom(&settings.custom_colors);
     }
     find(id)
         .unwrap_or_else(|| panic!("settings name theme {id}, which validation admits"))
