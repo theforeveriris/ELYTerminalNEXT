@@ -1,5 +1,6 @@
 pub mod app;
 pub mod blur;
+pub mod editor;
 pub mod files;
 pub mod git;
 pub mod location;

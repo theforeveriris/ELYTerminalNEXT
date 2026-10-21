@@ -98,6 +98,12 @@ impl SettingsWindow {
             .flex_col()
             .gap_1()
             .child(PathInput::new("settings-start-folder", &self.start_folder));
+        let editor = div()
+            .w(cx.theme().prose_width())
+            .flex()
+            .flex_col()
+            .gap_1()
+            .child(PathInput::new("settings-editor", &self.editor));
         let lines = NumberInput::new(("scrollback", self.drafts), f64::from(settings.scrollback))
             .range(f64::from(*SCROLLBACK.start()), f64::from(*SCROLLBACK.end()))
             .step(1000.)
@@ -144,6 +150,11 @@ impl SettingsWindow {
                 SettingsRow::new(language::message(cx, "settings.terminal.start.folder"))
                     .description(language::message(cx, "settings.terminal.start.folder.hint"))
                     .control(fixed),
+            )
+            .row(
+                SettingsRow::new(language::message(cx, "settings.terminal.editor"))
+                    .description(language::message(cx, "settings.terminal.editor.hint"))
+                    .control(editor),
             )
             .row(
                 SettingsRow::new(language::message(cx, "settings.terminal.scrollback"))

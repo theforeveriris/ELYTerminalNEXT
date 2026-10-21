@@ -18,7 +18,7 @@ use gpui::{
     Task, Window, div,
 };
 
-use crate::{git, sessions};
+use crate::{editor, git, sessions, settings::SettingsStore};
 
 /// A folder's entry: its name, and whether it is a folder, links followed.
 #[derive(Debug, PartialEq)]
@@ -322,8 +322,18 @@ impl Render for Files {
         })
         .on_activate(move |key, _, cx| match open.read(cx).path(key) {
             Some(path) => {
-                log::info!("files: opening {}", path.display());
-                cx.open_with_system(&path)
+                let editor = SettingsStore::get(cx).editor.trim().to_string();
+                if editor.is_empty() {
+                    log::info!("files: opening {} with the system", path.display());
+                    cx.open_with_system(&path);
+                } else {
+                    match editor::open(&editor, &path) {
+                        Ok(_) => log::info!("files: opening {} with {editor}", path.display()),
+                        Err(error) => {
+                            log::error!("files: {editor} cannot open {}: {error}", path.display())
+                        }
+                    }
+                }
             }
             None => log::warn!("files: {key} to open is gone"),
         })

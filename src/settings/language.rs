@@ -120,6 +120,11 @@ const EN: &[(&str, &str)] = &[
         "Read when the start is a fixed folder",
     ),
     ("settings.terminal.restore", "Reopen last time's tabs"),
+    ("settings.terminal.editor", "Editor"),
+    (
+        "settings.terminal.editor.hint",
+        "Opens files from the panel; empty opens them with the system",
+    ),
     ("settings.terminal.scrollback", "Scrollback lines"),
     ("settings.terminal.option", "Option as Alt"),
     ("settings.terminal.option.off", "Off"),
@@ -202,6 +207,11 @@ const ZH: &[(&str, &str)] = &[
         "起始目录选固定目录时使用",
     ),
     ("settings.terminal.restore", "恢复上次的标签页"),
+    ("settings.terminal.editor", "编辑器"),
+    (
+        "settings.terminal.editor.hint",
+        "从文件面板打开文件；留空则交给系统默认程序",
+    ),
     ("settings.terminal.scrollback", "回滚行数"),
     ("settings.terminal.option", "Option 视作 Alt"),
     ("settings.terminal.option.off", "关闭"),

@@ -66,6 +66,8 @@ pub enum PanelTab {
 pub struct Settings {
     /// A program path; empty runs the login shell.
     pub shell: String,
+    /// The editor a file opens in; empty opens it with the system.
+    pub editor: String,
     pub start_in: StartIn,
     /// The folder a session starts in when `start_in` is `Fixed`.
     pub start_in_folder: String,
@@ -121,6 +123,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             shell: String::new(),
+            editor: String::new(),
             start_in: StartIn::Home,
             start_in_folder: String::new(),
             last_folder: None,

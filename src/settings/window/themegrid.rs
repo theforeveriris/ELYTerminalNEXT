@@ -34,7 +34,7 @@ pub(super) fn grid(
             let (id, this) = (each.id, this.clone());
             let key = SharedString::from(format!("{field}-{id}"));
             RadioCard::new(key, chosen == Some(id), each.name)
-                .preview(super::appearance::preview(each, cx))
+                .preview(super::preview::preview(each, cx))
                 .on_select(move |_, cx| {
                     set(&this, format!("{field} is {id}"), cx, |settings| {
                         if dark {
@@ -50,7 +50,7 @@ pub(super) fn grid(
             let this = this.clone();
             let key = SharedString::from(format!("{field}-{id}"));
             RadioCard::new(key, chosen == Some(id), custom.name)
-                .preview(super::appearance::preview(&custom, cx))
+                .preview(super::preview::preview(&custom, cx))
                 .on_select(move |_, cx| {
                     set(&this, format!("{field} is {id}"), cx, |settings| {
                         if dark {
