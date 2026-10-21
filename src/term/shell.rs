@@ -13,6 +13,7 @@ use super::{
 };
 
 pub mod scan;
+mod versions;
 
 /// Each script, by its path under the integration folder.
 const SCRIPTS: [(&str, &str); 4] = [
@@ -129,7 +130,7 @@ pub fn probe_in_background(cx: &mut App) {
             .background_executor()
             .spawn(async move {
                 let mut shells = shells;
-                scan::versions(&mut shells);
+                versions::versions(&mut shells);
                 shells
             })
             .await;

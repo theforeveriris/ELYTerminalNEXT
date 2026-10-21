@@ -100,6 +100,8 @@
 - **INP-10**：鼠标报告支持 1005、1006、1015、1016（1016 用像素坐标），并支持横向滚轮 66/67。
 - **UI-02**：设置里的「Import…」读取 iTerm2 `.itermcolors`、Windows Terminal JSON 或 Ghostty 主题，落到自定义配色并切换过去。
 - **PANEL-09 / 10**：文件面板选中一项后可复制其路径，或在资源管理器/Finder/xdg-open 中显示。
+- **SHELL-02**：启动后在后台向每个 shell 询问版本（PowerShell 5.1/7、bash、cmd、WSL、nu 等），设置里的 shell 列表显示成 `Name (version)`。
+- **TAB-26**：主窗口的大小与位置都写进设置；恢复时限制在主屏可见区域内，屏幕变化不会把窗口留在外面。
 
 ---
 
