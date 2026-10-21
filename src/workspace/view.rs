@@ -147,6 +147,34 @@ impl Workspace {
             .child(List::new().children(rows))
     }
 
+    /// Fills the window with the shown pane, or gives the grid back.
+    pub fn toggle_zoom(&mut self, cx: &mut Context<Self>) {
+        match self.zoom.take() {
+            Some(id) => log::info!("app: pane {id} gives the grid back"),
+            None => {
+                self.zoom = Some(self.active);
+                log::info!("app: pane {} fills the window", self.active);
+            }
+        }
+        cx.notify();
+    }
+
+    /// Hides both columns for the terminal, or shows them as the settings keep them.
+    pub fn toggle_zen(&mut self, cx: &mut Context<Self>) {
+        self.zen = !self.zen;
+        log::info!("app: zen {}", if self.zen { "on" } else { "off" });
+        cx.notify();
+    }
+
+    /// Whether each side column shows now: zen hides both, and otherwise the settings decide.
+    fn columns(&self, settings: &Settings) -> (bool, bool) {
+        if self.zen {
+            (false, false)
+        } else {
+            (settings.show_sessions, settings.show_panel)
+        }
+    }
+
     /// The panes of the shown tab, laid out as a grid.
     fn panes(&self) -> impl IntoElement {
         let Some(tab) = self.tab() else {

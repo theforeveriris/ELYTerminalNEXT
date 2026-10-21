@@ -10,7 +10,7 @@ use crate::{
     files::Files,
     git::panel::{Acted, GitPanel},
     sessions::{Session, orb},
-    settings::{Settings, SettingsStore},
+    settings::SettingsStore,
     term::{
         Events, Launch, Pty, TerminalView, config,
         shell::{ShellIntegration, launch},
@@ -490,67 +490,5 @@ impl Workspace {
             log::debug!("app: the title is {title:?}");
             window.set_window_title(title);
         }
-    }
-
-    /// Shows or hides a side column, as the settings keep it.
-    fn toggle(&mut self, flip: fn(&mut Settings), cx: &mut Context<Self>) {
-        self.zen = false;
-        match SettingsStore::update(cx, flip) {
-            Ok(()) => {
-                let settings = SettingsStore::get(cx);
-                let shown = |on: bool| if on { "shown" } else { "hidden" };
-                log::info!(
-                    "app: sessions {}, right column {}",
-                    shown(settings.show_sessions),
-                    shown(settings.show_panel)
-                );
-            }
-            Err(error) => log::error!("app: the columns stay: {error:#}"),
-        }
-    }
-
-    /// Fills the window with the shown pane, or gives the grid back.
-    pub fn toggle_zoom(&mut self, cx: &mut Context<Self>) {
-        match self.zoom.take() {
-            Some(id) => log::info!("app: pane {id} gives the grid back"),
-            None => {
-                self.zoom = Some(self.active);
-                log::info!("app: pane {} fills the window", self.active);
-            }
-        }
-        cx.notify();
-    }
-
-    /// Hides both columns for the terminal, or shows them as the settings keep them.
-    pub fn toggle_zen(&mut self, cx: &mut Context<Self>) {
-        self.zen = !self.zen;
-        log::info!("app: zen {}", if self.zen { "on" } else { "off" });
-        cx.notify();
-    }
-
-    /// Whether each side column shows now: zen hides both, and otherwise the settings decide.
-    fn columns(&self, settings: &Settings) -> (bool, bool) {
-        if self.zen {
-            (false, false)
-        } else {
-            (settings.show_sessions, settings.show_panel)
-        }
-    }
-
-    /// Shows the next session, or the one before, round the ends.
-    fn step(&mut self, forward: bool, window: &mut Window, cx: &mut Context<Self>) {
-        let count = self.sessions.len();
-        if count == 0 {
-            return;
-        }
-        let by = if forward { 1 } else { count - 1 };
-        let next = self.session_order();
-        let at = next
-            .iter()
-            .position(|id| *id == self.active)
-            .map(|at| (at + by) % count)
-            .unwrap_or(0);
-        let id = next[at];
-        self.select(id, window, cx);
     }
 }

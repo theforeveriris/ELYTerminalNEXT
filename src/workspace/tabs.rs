@@ -4,7 +4,7 @@ use gpui::{Context, Window};
 
 use super::Workspace;
 use super::layout::{Direction, SessionId, Tab};
-use crate::settings::SettingsStore;
+use crate::settings::{Settings, SettingsStore};
 use crate::term::shell::{ShellIntegration, launch};
 use crate::term::{Launch, Quote, Target, config, spawn};
 
@@ -208,5 +208,39 @@ impl Workspace {
             }
         }
         self.close(id, window, cx);
+    }
+
+    /// Shows or hides a side column, as the settings keep it.
+    pub(super) fn toggle(&mut self, flip: fn(&mut Settings), cx: &mut Context<Self>) {
+        self.zen = false;
+        match SettingsStore::update(cx, flip) {
+            Ok(()) => {
+                let settings = SettingsStore::get(cx);
+                let shown = |on: bool| if on { "shown" } else { "hidden" };
+                log::info!(
+                    "app: sessions {}, right column {}",
+                    shown(settings.show_sessions),
+                    shown(settings.show_panel)
+                );
+            }
+            Err(error) => log::error!("app: the columns stay: {error:#}"),
+        }
+    }
+
+    /// Shows the next session, or the one before, round the ends.
+    pub(super) fn step(&mut self, forward: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let count = self.sessions.len();
+        if count == 0 {
+            return;
+        }
+        let by = if forward { 1 } else { count - 1 };
+        let next = self.session_order();
+        let at = next
+            .iter()
+            .position(|id| *id == self.active)
+            .map(|at| (at + by) % count)
+            .unwrap_or(0);
+        let id = next[at];
+        self.select(id, window, cx);
     }
 }
