@@ -127,8 +127,10 @@ pub fn load(path: &Path) -> anyhow::Result<Settings> {
     let mut reader = serde_json::Deserializer::from_str(&text);
     let settings: Settings = serde_path_to_error::deserialize(&mut reader).map_err(|error| {
         anyhow::anyhow!(
-            "settings: {} does not parse at `{}`: {}",
+            "settings: {} does not parse at line {}, column {} (`{}`): {}",
             path.display(),
+            error.inner().line(),
+            error.inner().column(),
             error.path(),
             error.inner()
         )
@@ -286,6 +288,7 @@ mod tests {
         fs::write(&path, "{ font_size: ").expect("write");
         let error = load(&path).expect_err("does not parse");
         assert!(format!("{error:#}").contains("does not parse"));
+        assert!(error.to_string().contains("line 1, column"), "{error}");
         assert!(error.to_string().contains("settings.json"));
         let named = |json: &str, field: &str| {
             fs::write(&path, json).expect("write");
