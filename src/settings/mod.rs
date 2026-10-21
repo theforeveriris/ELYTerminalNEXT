@@ -71,6 +71,8 @@ pub struct Settings {
     pub start_in_folder: String,
     /// The folder the last new session started in, for `start_in`'s `Last`.
     pub last_folder: Option<String>,
+    /// Opens the tabs the window last had at start.
+    pub restore_session: bool,
     pub theme: String,
     /// The theme while the system is dark; none keeps `theme`.
     pub dark_theme: Option<String>,
@@ -120,6 +122,7 @@ impl Default for Settings {
             start_in: StartIn::Home,
             start_in_folder: String::new(),
             last_folder: None,
+            restore_session: true,
             theme: themes::default_id().into(),
             dark_theme: None,
             font_family: "JetBrains Mono".into(),

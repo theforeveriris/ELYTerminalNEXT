@@ -3,7 +3,7 @@
 
 use ely_gpui_component::Assets;
 use elyterminal::{
-    app,
+    app, session,
     settings::SettingsStore,
     term::shell::{ShellIntegration, launch},
 };
@@ -24,7 +24,16 @@ fn run(cx: &mut App) -> anyhow::Result<()> {
     app::start(cx)?;
     let home = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("app: no home folder"))?;
     let settings = SettingsStore::get(cx);
-    let folder = settings.start_folder(&home, None);
+    let mut folder = settings.start_folder(&home, None);
+    if settings.restore_session
+        && let Some(saved) = session::path().and_then(|path| session::load(&path))
+        && let Some(tab) = saved.tabs.first()
+    {
+        let kept = std::path::PathBuf::from(&tab.cwd);
+        if kept.is_dir() {
+            folder = kept;
+        }
+    }
     let launch = launch(&settings.shell, folder, &cx.global::<ShellIntegration>().0)?;
     app::open(launch, cx)?;
     cx.activate(true);

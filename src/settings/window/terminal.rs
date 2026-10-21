@@ -189,9 +189,19 @@ impl SettingsWindow {
             settings.copy_on_select,
             |settings, on| settings.copy_on_select = on,
         );
+        let restore = switch(
+            this,
+            "restore_session",
+            settings.restore_session,
+            |settings, on| settings.restore_session = on,
+        );
         let ely = switch(this, "ely", settings.ely, |settings, on| settings.ely = on);
         let section = section
             .row(SettingsRow::new(language::message(cx, "settings.terminal.copy")).control(copy))
+            .row(
+                SettingsRow::new(language::message(cx, "settings.terminal.restore"))
+                    .control(restore),
+            )
             .row(
                 SettingsRow::new(language::message(cx, "settings.terminal.ely"))
                     .description("Peeks over the window, her face as your sessions are")

@@ -1,12 +1,13 @@
 //! The tabs of the window and the panes in them.
 
-use gpui::{Context, Window};
+use gpui::{AppContext, Context, Window};
 
 use super::Workspace;
 use super::layout::{Direction, SessionId, Tab};
+use crate::sessions::Session;
 use crate::settings::{Settings, SettingsStore};
 use crate::term::shell::{ShellIntegration, launch};
-use crate::term::{Launch, Quote, Target, config, spawn};
+use crate::term::{Events, Launch, Pty, Quote, Target, TerminalView, config, spawn};
 
 impl Workspace {
     /// The sessions in the order the keys walk them: the shown tab's panes first, then the other tabs'.
@@ -23,6 +24,40 @@ impl Workspace {
             }
         }
         order
+    }
+
+    /// Adds a session, and shows it in a new pane of the shown tab.
+    pub(super) fn add(
+        &mut self,
+        pty: Pty,
+        events: Events,
+        launch: Launch,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> SessionId {
+        let terminal = cx.new(|cx| TerminalView::new(pty, events, window, cx));
+        let id = terminal.entity_id();
+        let events = cx.subscribe_in(&terminal, window, move |this, _, event, window, cx| {
+            this.session_event(id, event, window, cx)
+        });
+        let pid = terminal.read(cx).pid();
+        log::info!("app: session {pid} opens in {}", launch.cwd.display());
+        let session = self.next_id;
+        self.next_id += 1;
+        self.sessions.push(Session {
+            id: session,
+            terminal,
+            title: String::new(),
+            name: String::new(),
+            editing: None,
+            folder: launch.cwd,
+            reports: launch.reports,
+            bell: false,
+            waiting: false,
+            look: None,
+            _events: events,
+        });
+        session
     }
 
     /// Opens a tab, with a new session in it.

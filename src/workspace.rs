@@ -9,10 +9,11 @@ use crate::{
     blur::Blur,
     files::Files,
     git::panel::{Acted, GitPanel},
-    sessions::{Session, orb},
+    sessions::Session,
+    sessions::orb,
     settings::SettingsStore,
     term::{
-        Events, Launch, Pty, TerminalView, config,
+        Events, Launch, Pty, config,
         shell::{ShellIntegration, launch},
         spawn,
     },
@@ -21,6 +22,7 @@ use crate::{
 mod events;
 mod layout;
 mod rename;
+mod restore;
 mod tabs;
 mod view;
 mod widths;
@@ -172,6 +174,8 @@ pub struct Workspace {
     zoom: Option<SessionId>,
     /// Whether both columns step aside for the terminal.
     zen: bool,
+    /// Writes the tabs a moment after the last change that could alter them.
+    saving: Option<Task<()>>,
     _settings: Subscription,
     _acted: Subscription,
 }
@@ -194,6 +198,10 @@ impl Workspace {
                 .unwrap_or_default();
             this.files.update(cx, |files, cx| files.show(&folder, cx));
         });
+        let saved = SettingsStore::get(cx)
+            .restore_session
+            .then(Self::saved)
+            .flatten();
         let mut workspace = Self {
             focus: cx.focus_handle(),
             sessions: Vec::new(),
@@ -208,6 +216,7 @@ impl Workspace {
             next_id: 1,
             zoom: None,
             zen: false,
+            saving: None,
             _settings: cx.observe_global_in::<SettingsStore>(window, |this, window, cx| {
                 this.background.follow(window, SettingsStore::get(cx));
                 cx.notify();
@@ -215,44 +224,19 @@ impl Workspace {
             _acted: acted,
         };
         let first = workspace.add(pty, events, launch, window, cx);
-        workspace.tabs.push(Tab::new(first));
+        let mut first_tab = Tab::new(first);
+        if let Some(saved) = &saved
+            && let Some(tab) = saved.tabs.first()
+        {
+            first_tab.name = tab.name.clone();
+        }
+        workspace.tabs.push(first_tab);
         workspace.active_tab = 0;
         workspace.select(first, window, cx);
+        if let Some(saved) = saved {
+            workspace.restore(saved, window, cx);
+        }
         workspace
-    }
-
-    /// Adds a session, and shows it in a new pane of the shown tab.
-    fn add(
-        &mut self,
-        pty: Pty,
-        events: Events,
-        launch: Launch,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> SessionId {
-        let terminal = cx.new(|cx| TerminalView::new(pty, events, window, cx));
-        let id = terminal.entity_id();
-        let events = cx.subscribe_in(&terminal, window, move |this, _, event, window, cx| {
-            this.session_event(id, event, window, cx)
-        });
-        let pid = terminal.read(cx).pid();
-        log::info!("app: session {pid} opens in {}", launch.cwd.display());
-        let session = self.next_id;
-        self.next_id += 1;
-        self.sessions.push(Session {
-            id: session,
-            terminal,
-            title: String::new(),
-            name: String::new(),
-            editing: None,
-            folder: launch.cwd,
-            reports: launch.reports,
-            bell: false,
-            waiting: false,
-            look: None,
-            _events: events,
-        });
-        session
     }
 
     /// The session with the id, if it is still here.
@@ -397,6 +381,7 @@ impl Workspace {
         }
         log::debug!("app: session {id} shown");
         self.retitle(window);
+        self.save_soon(cx);
         cx.notify();
     }
 
@@ -461,6 +446,7 @@ impl Workspace {
         } else {
             cx.notify();
         }
+        self.save_soon(cx);
         let _ = pid;
     }
 

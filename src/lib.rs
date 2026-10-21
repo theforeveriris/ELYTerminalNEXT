@@ -5,6 +5,7 @@ pub mod git;
 pub mod location;
 pub mod menus;
 pub mod pet;
+pub mod session;
 pub mod sessions;
 pub mod settings;
 pub mod ssh;
