@@ -380,6 +380,10 @@ impl Render for TerminalView {
         let lit = self.finder.as_ref().map_or_else(Vec::new, |finder| {
             finder.lit(&term, cx.theme().colors.warning)
         });
+        let marks = self
+            .finder
+            .as_ref()
+            .map_or_else(Vec::new, |finder| finder.marks(&term));
         let shown = frame(&term, &ink, &lit);
         let blinks = term.cursor_style().blinking;
         let span = Span::of(&term);
@@ -455,7 +459,7 @@ impl Render for TerminalView {
             .relative()
             .size_full()
             .child(root)
-            .children(scrollbar::bar(span, window, cx))
+            .children(scrollbar::bar(span, &marks, window, cx))
             .children(
                 self.find_box(cx)
                     .map(|found| div().absolute().top_2().right_4().child(found)),

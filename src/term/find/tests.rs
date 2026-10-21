@@ -222,6 +222,22 @@ fn a_line_that_grows_or_changes_keeps_the_match_at_its_place() {
 }
 
 #[test]
+fn matches_sit_down_the_history_for_the_scrollbar() {
+    let mut term = term("one\r\ntwo\r\none", 10, 3, 10);
+    for line in 0..5 {
+        feed(&mut term, &format!("line {line}\r\n"));
+    }
+    let found = found(&term, "one", PLAIN);
+    let marks = found.marks(
+        term.topmost_line(),
+        term.grid().history_size() + term.screen_lines(),
+    );
+    assert_eq!(marks.len(), 2);
+    assert!(marks.iter().all(|at| (0.0..=1.0).contains(at)));
+    assert!(marks[0] <= marks[1], "oldest first");
+}
+
+#[test]
 fn a_selection_seeds_the_find_when_it_is_one_line() {
     assert_eq!(query_from_selection("error"), Some("error"));
     assert_eq!(query_from_selection("  error \r\n"), Some("error"));

@@ -34,6 +34,12 @@ pub struct Finder {
 }
 
 impl Finder {
+    /// Where its matches sit down the whole history, for the scrollbar.
+    pub fn marks<T>(&self, term: &Term<T>) -> Vec<f32> {
+        let total = term.grid().history_size() + term.screen_lines();
+        self.found.marks(term.topmost_line(), total)
+    }
+
     /// The matches on screen, each with its wash; the current one's is stronger.
     pub fn lit<T>(&self, term: &Term<T>, color: Hsla) -> Vec<(Match, Hsla)> {
         let offset = term.grid().display_offset() as i32;
@@ -145,6 +151,19 @@ impl<T> Walk<'_, T> {
 }
 
 impl Found {
+    /// Where its matches sit down the whole history, each from 0 at the oldest line to 1 at the newest, at most 200.
+    fn marks(&self, top: Line, total: usize) -> Vec<f32> {
+        let total = total.max(1) as f32;
+        self.hits
+            .iter()
+            .take(200)
+            .map(|hit| {
+                let line = (hit.start().line.0 - top.0) as f32;
+                (line / total).clamp(0.0, 1.0)
+            })
+            .collect()
+    }
+
     /// Every match of `query`, oldest first; a pattern that does not compile is an error.
     fn search<T>(term: &Term<T>, query: &str, options: FindOptions) -> Result<Self, String> {
         let history = term.grid().history_size();

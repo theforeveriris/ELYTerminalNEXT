@@ -9,7 +9,8 @@ use alacritty_terminal::{
 use ely_gpui_component::theme::ActiveTheme;
 use gpui::{
     AnyElement, AppContext as _, Context, DragMoveEvent, EmptyView, EntityId, InteractiveElement,
-    IntoElement, ParentElement, Pixels, StatefulInteractiveElement, Styled, Window, div, relative,
+    IntoElement, ParentElement, Pixels, StatefulInteractiveElement, Styled, Window, div, px,
+    relative,
 };
 
 use super::view::TerminalView;
@@ -55,7 +56,12 @@ impl Span {
 }
 
 /// The bar along the view's right edge, over the padding there; none without history, as on the alternate screen.
-pub(super) fn bar(span: Span, window: &Window, cx: &Context<TerminalView>) -> Option<AnyElement> {
+pub(super) fn bar(
+    span: Span,
+    marks: &[f32],
+    window: &Window,
+    cx: &Context<TerminalView>,
+) -> Option<AnyElement> {
     if span.history == 0 {
         return None;
     }
@@ -98,7 +104,17 @@ pub(super) fn bar(span: Span, window: &Window, cx: &Context<TerminalView>) -> Op
         .on_drag_move(cx.listener(TerminalView::drag_thumb))
         .child(above)
         .child(thumb)
-        .child(below);
+        .child(below)
+        .children(marks.iter().map(|at| {
+            div()
+                .absolute()
+                .top(relative(*at))
+                .left_0()
+                .w_full()
+                .h(px(1.5))
+                .bg(theme.colors.warning)
+                .into_any_element()
+        }));
     Some(bar.into_any_element())
 }
 
