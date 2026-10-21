@@ -222,6 +222,14 @@ fn a_line_that_grows_or_changes_keeps_the_match_at_its_place() {
 }
 
 #[test]
+fn a_selection_seeds_the_find_when_it_is_one_line() {
+    assert_eq!(query_from_selection("error"), Some("error"));
+    assert_eq!(query_from_selection("  error \r\n"), Some("error"));
+    assert_eq!(query_from_selection("a\nb"), None, "two lines are no query");
+    assert_eq!(query_from_selection(" \n "), None, "blank");
+}
+
+#[test]
 fn following_a_long_line_takes_one_pass() {
     let mut long = term(&"a".repeat(1_000_000), 147, 48, 10_000);
     let then = found(&long, "a", PLAIN);

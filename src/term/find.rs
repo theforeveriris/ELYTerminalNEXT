@@ -251,13 +251,35 @@ fn stepped(current: Option<usize>, count: usize, newer: bool) -> Option<usize> {
     })
 }
 
+/// The text a find starts with when the selection is one line, else none.
+pub(crate) fn query_from_selection(text: &str) -> Option<&str> {
+    let query = text.trim_end_matches(['\r', '\n']).trim();
+    (!query.is_empty() && !query.contains(['\r', '\n'])).then_some(query)
+}
+
 impl TerminalView {
     /// Opens the find box, or takes the focus back to it.
     pub(super) fn find(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let selected = if self.finder.is_none() {
+            self.pty
+                .term
+                .lock()
+                .selection_to_string()
+                .and_then(|text| query_from_selection(&text).map(str::to_string))
+        } else {
+            None
+        };
         let query = match &self.finder {
             Some(finder) => finder.query.clone(),
             None => {
-                let query = cx.new(|cx| TextInput::new(window, cx));
+                let seed = selected.clone();
+                let query = cx.new(|cx| {
+                    let mut input = TextInput::new(window, cx);
+                    if let Some(text) = seed {
+                        input.set_text(text, cx);
+                    }
+                    input
+                });
                 let input = cx.subscribe_in(&query, window, |view, _, event, _, cx| match event {
                     InputEvent::Changed => view.search(true, cx),
                     InputEvent::Submit => view.step(false, cx),
@@ -279,6 +301,9 @@ impl TerminalView {
             let all = 0..input.text().len();
             input.select(all, cx);
         });
+        if selected.is_some() {
+            self.search(true, cx);
+        }
         window.focus(&query.focus_handle(cx), cx);
         cx.notify();
     }
