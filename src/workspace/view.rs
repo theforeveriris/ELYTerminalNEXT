@@ -4,18 +4,17 @@ use std::time::Instant;
 
 use ely_gpui_component::{
     buttons::{ButtonVariant, IconButton, SegmentedControl},
-    lists::List,
+    lists::{List, ListItem},
     primitives::{FocusScope, IconName},
-    shell::{ColumnShell, ResizeBorder, ShellColumn, TabBar, WindowTab},
+    shell::{ColumnShell, ResizeBorder, ShellColumn},
     theme::ControlSize,
     typography::Caption,
 };
 use gpui::{
-    App, Context, Entity, IntoElement, Render, SharedString, StyleRefinement, Styled, Window, div,
-    prelude::*,
+    AnyElement, App, Context, Entity, IntoElement, Render, SharedString, StyleRefinement, Styled,
+    Window, div, prelude::*,
 };
 
-use super::layout::Tab;
 use super::{
     CONTEXT, ClosePane, CloseSession, CloseTab, FocusPane, LastSession, LastTab, NewSession,
     NewTab, NextSession, NextTab, PreviousSession, PreviousTab, SelectSession, SelectTab, Side,
@@ -59,40 +58,71 @@ fn column_toggle(
 }
 
 impl Workspace {
-    /// The tab bar across the top of the terminal column.
-    fn tab_bar(&self, workspace: &Entity<Workspace>) -> impl IntoElement {
-        let mut bar = TabBar::new("tab-bar");
+    /// The sessions column: a row for each tab, and under the shown one a row for each of its panes.
+    fn tabs_column(&self, workspace: &Entity<Workspace>, cx: &App) -> impl IntoElement {
+        let home = dirs::home_dir();
+        let now = Instant::now();
+        let mut rows: Vec<AnyElement> = Vec::new();
         for (at, tab) in self.tabs.iter().enumerate() {
+            let shown = at == self.active_tab;
             let title = tab
                 .focused_session()
                 .and_then(|id| self.session(id))
                 .map_or(TITLE, Session::named);
             let title = tab.named(title, TITLE).to_string();
-            // A tab with panes names them all, so the count shows beside it.
-            let title = match tab.panes.len() {
-                1 => title,
-                count => format!("{title} ({count})"),
-            };
-            bar = bar.tab(WindowTab::new(format!("tab-{at}"), title));
+            let select = workspace.clone();
+            let close = workspace.clone();
+            // A tab names its own sessions, so it shows how many it holds.
+            let count = tab.panes.len();
+            let tab_row = ListItem::new(("tab", at), title)
+                .selected(shown)
+                .strong(shown)
+                .detail(if count > 1 {
+                    format!("{count}")
+                } else {
+                    String::new()
+                })
+                .on_click(move |_, window, cx| {
+                    select.update(cx, |this, cx| this.select_tab(at, window, cx))
+                })
+                .trailing(
+                    IconButton::new(("close-tab", at), IconName::X)
+                        .variant(ButtonVariant::Ghost)
+                        .size(ControlSize::Sm)
+                        .tooltip("Close tab")
+                        .on_click(move |_, window, cx| {
+                            cx.stop_propagation();
+                            close.update(cx, |this, cx| this.close_tab_at(at, window, cx))
+                        }),
+                );
+            rows.push(tab_row.into_any_element());
+            // The shown tab's panes hang under it, so the column reads as a tree.
+            if !shown {
+                continue;
+            }
+            for id in tab.sessions() {
+                let Some(session) = self.session(id) else {
+                    continue;
+                };
+                let active = session.id == self.active;
+                let row = sessions::row(
+                    workspace,
+                    session.id,
+                    session,
+                    active,
+                    home.as_deref(),
+                    now,
+                    cx,
+                );
+                rows.push(row.into_any_element());
+            }
         }
-        let selected = format!("tab-{}", self.active_tab);
-        let on_select = workspace.clone();
-        let on_close = workspace.clone();
-        let on_add = workspace.clone();
-        bar.selected(selected)
-            .on_select(move |id, window, cx| {
-                let Some(at) = id.strip_prefix("tab-").and_then(|at| at.parse().ok()) else {
-                    return;
-                };
-                on_select.update(cx, |this, cx| this.select_tab(at, window, cx));
-            })
-            .on_close(move |id, window, cx| {
-                let Some(at) = id.strip_prefix("tab-").and_then(|at| at.parse().ok()) else {
-                    return;
-                };
-                on_close.update(cx, |this, cx| this.close_tab_at(at, window, cx));
-            })
-            .on_add(move |window, cx| on_add.update(cx, |this, cx| this.new_tab(window, cx)))
+        div()
+            .id("tabs")
+            .size_full()
+            .overflow_y_scroll()
+            .p_2()
+            .child(List::new().children(rows))
     }
 
     /// The panes of the shown tab, laid out as a grid.
@@ -168,56 +198,30 @@ impl Render for Workspace {
         let mut shell = ColumnShell::new("workspace").glass();
         let mut terminal = ShellColumn::new("terminal")
             .title(self.title().to_string())
-            .child(
-                div()
-                    .flex()
-                    .flex_col()
-                    .w_full()
-                    .flex_none()
-                    .px_2()
-                    .pt_1()
-                    .child(self.tab_bar(&workspace)),
-            )
             .child(self.panes());
         if settings.show_sessions {
-            let home = dirs::home_dir();
-            // The column lists the sessions of the shown tab, so the bar above and the list beside it each name one thing.
-            let ids = self.tab().map(Tab::sessions).unwrap_or_default();
-            let rows = ids
-                .iter()
-                .filter_map(|id| self.session(*id))
-                .map(|session| {
-                    let active = session.id == self.active;
-                    sessions::row(
-                        &workspace,
-                        session.id,
-                        session,
-                        active,
-                        home.as_deref(),
-                        now,
-                        cx,
-                    )
-                });
-            let list = List::new().children(rows);
-            let new = IconButton::new("new-session", IconName::Plus)
+            let adder = workspace.clone();
+            let new = IconButton::new("new-tab", IconName::Plus)
                 .variant(ButtonVariant::Ghost)
                 .size(ControlSize::Sm)
-                .tooltip("New session")
+                .tooltip("New tab")
                 .on_click(move |_, window, cx| {
-                    workspace.update(cx, |this, cx| this.new_session_in_pane(window, cx))
+                    adder.update(cx, |this, cx| this.new_tab(window, cx))
                 });
+            let splitter = workspace.clone();
+            let split = IconButton::new("split-pane", IconName::PanelRight)
+                .variant(ButtonVariant::Ghost)
+                .size(ControlSize::Sm)
+                .tooltip("Split the pane")
+                .on_click(move |_, window, cx| {
+                    splitter.update(cx, |this, cx| this.split(true, window, cx))
+                });
+            let column = self.tabs_column(&workspace, cx);
             shell = shell.column(
                 self.side_column(Side::Sessions, cx)
                     .leading(left)
-                    .action(new)
-                    .child(
-                        div()
-                            .id("sessions")
-                            .size_full()
-                            .overflow_y_scroll()
-                            .p_2()
-                            .child(list),
-                    ),
+                    .action(div().flex().items_center().gap_1().child(new).child(split))
+                    .child(column),
             );
         } else {
             terminal = terminal.leading(left);
