@@ -98,7 +98,7 @@
 - **CFG-02**：设置文件每秒检查 mtime，外部编辑保存后 700ms 内生效；坏文件保留旧设置且只报一次。
 - **SHELL-14**：设置窗口可重新写入 shell 集成脚本；`repair` 会先清空再写，安装目录可查看。
 - **INP-10**：鼠标报告支持 1005、1006、1015、1016（1016 用像素坐标），并支持横向滚轮 66/67。
-- **UI-02**：设置里的「Import…」读取 iTerm2 `.itermcolors`、Windows Terminal JSON 或 Ghostty 主题，落到自定义配色并切换过去。
+- **UI-02**：设置里的「Import…」读取 iTerm2 `.itermcolors`、Windows Terminal JSON 或 Ghostty 主题，落到自定义配色并切换过去；「Export…」把当前主题写成 Ghostty 文件。
 - **PANEL-09 / 10**：文件面板选中一项后可复制其路径，或在资源管理器/Finder/xdg-open 中显示。
 - **SHELL-02**：启动后在后台向每个 shell 询问版本（PowerShell 5.1/7、bash、cmd、WSL、nu 等），设置里的 shell 列表显示成 `Name (version)`。
 - **TAB-26**：主窗口的大小与位置都写进设置；恢复时限制在主屏可见区域内，屏幕变化不会把窗口留在外面。
@@ -107,6 +107,7 @@
 - **FIND-06**：滚动条上以细线标出搜索命中的历史位置，当前结果仍在主屏高亮。
 - **A11Y-06（部分）**：新增「界面字号」（10–24px），只缩放侧栏、设置与标签等 UI，终端的字体大小仍由 Font size 单独控制。
 - **PANEL-06 / PATH-09**：文件面板双击文件时，若设置了 Editor 命令（如 `code -g {file}:1`）就用它打开，否则交给系统默认程序；命令支持引号、反斜杠和 `{file}` 占位符。
+- **CFG-14**：`settings.json` 解析失败时给出文件名、行号、列号与字段路径，旧设置保持不变。
 
 ---
 
