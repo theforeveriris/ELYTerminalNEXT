@@ -163,7 +163,27 @@ fn a_local_uri_gives_its_decoded_folder() {
 }
 
 #[test]
-fn other_hosts_and_bad_uris_give_none() {
+fn conemu_and_iterm2_current_folders_read_too() {
+    assert_eq!(
+        current_dir(br"9;9;C:\Users\me\src"),
+        Some(PathBuf::from(r"C:\Users\me\src"))
+    );
+    assert_eq!(
+        current_dir(b"1337;CurrentDir=/tmp/ely%20dir"),
+        Some(PathBuf::from("/tmp/ely dir"))
+    );
+    assert_eq!(
+        current_dir(b"7;file:///tmp/x"),
+        Some(PathBuf::from("/tmp/x"))
+    );
+    assert_eq!(current_dir(b"9;9;"), None, "an empty folder");
+    assert_eq!(current_dir(b"9;9;a\nb"), None, "a control character");
+    assert_eq!(current_dir(b"1337;CurrentDir"), None, "no folder");
+    assert_eq!(current_dir(b"9;not a folder"), None);
+}
+
+#[test]
+fn a_folder_uri_from_elsewhere_is_ignored() {
     assert_eq!(folder(b"file://elsewhere.invalid/tmp"), None);
     assert_eq!(folder(b"http://x/y"), None);
     assert_eq!(folder(b"file:///%FF"), None);

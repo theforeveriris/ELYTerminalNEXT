@@ -122,10 +122,7 @@ fn report(
             {
                 log::debug!("pty {pid}: {status:?}");
                 PtyEvent::Status(status)
-            } else if let Some(ask) = ask(body, kitty) {
-                log::debug!("pty {pid}: {ask:?}");
-                PtyEvent::Ask(ask)
-            } else if let Some(folder) = body.strip_prefix(b"7;").and_then(folder) {
+            } else if let Some(folder) = current_dir(body) {
                 if last.as_ref() == Some(&folder) {
                     log::debug!("pty {pid}: folder {} again", folder.display());
                 } else {
@@ -133,6 +130,9 @@ fn report(
                     *last = Some(folder.clone());
                 }
                 PtyEvent::Folder(folder)
+            } else if let Some(ask) = ask(body, kitty) {
+                log::debug!("pty {pid}: {ask:?}");
+                PtyEvent::Ask(ask)
             } else if let Some(rest) = body
                 .strip_prefix(b"0;")
                 .or_else(|| body.strip_prefix(b"2;"))
@@ -348,6 +348,26 @@ impl Osc {
 
 /// The most values, subparameters too, one sequence holds before vte drops it.
 const PARAMS: usize = 32;
+
+/// The folder an OSC body names: OSC 7's URI, ConEmu's `9;9` or iTerm2's `CurrentDir`.
+pub(crate) fn current_dir(body: &[u8]) -> Option<PathBuf> {
+    if let Some(rest) = body.strip_prefix(b"9;9;") {
+        return path_text(rest);
+    }
+    if let Some(rest) = body.strip_prefix(b"1337;CurrentDir=") {
+        return crate::location::percent_decode(rest).map(PathBuf::from);
+    }
+    body.strip_prefix(b"7;").and_then(folder)
+}
+
+/// A path a program wrote raw, when it is UTF-8 and holds no control character.
+fn path_text(bytes: &[u8]) -> Option<PathBuf> {
+    let text = std::str::from_utf8(bytes).ok()?;
+    if text.is_empty() || text.chars().any(char::is_control) {
+        return None;
+    }
+    Some(PathBuf::from(text))
+}
 
 /// The local folder an OSC 7 `file://host/path` names; another host's folder is none.
 pub(crate) fn folder(body: &[u8]) -> Option<PathBuf> {
