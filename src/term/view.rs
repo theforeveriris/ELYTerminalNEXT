@@ -1,4 +1,10 @@
-use std::{collections::HashMap, path::PathBuf, process::ExitStatus, rc::Rc, time::Duration};
+use std::{
+    collections::HashMap,
+    path::PathBuf,
+    process::ExitStatus,
+    rc::Rc,
+    time::{Duration, Instant},
+};
 
 use alacritty_terminal::{
     event::Event,
@@ -17,6 +23,7 @@ use gpui::{
 };
 
 use super::{
+    blocks::{Blocks, completion},
     click::Shell,
     find::Finder,
     fonts::look,
@@ -79,6 +86,8 @@ pub struct TerminalView {
     pub(super) ran: bool,
     /// Where the shell stands, as its OSC 133 marks say.
     pub(super) shell: Shell,
+    /// The commands its shell's marks divide its work into.
+    pub(super) blocks: Blocks,
     /// The system notifications it posted.
     pub(super) notices: Notices,
     /// The program's title; empty while it names none.
@@ -141,6 +150,7 @@ impl TerminalView {
             ended: None,
             ran: false,
             shell: Shell::Busy,
+            blocks: Blocks::default(),
             notices: Notices::default(),
             title: String::new(),
             front: true,
@@ -171,6 +181,11 @@ impl TerminalView {
     /// What programs in this terminal say they are doing.
     pub fn records(&self) -> &Records {
         &self.records
+    }
+
+    /// The commands its shell's marks divide its work into.
+    pub fn blocks(&self) -> &Blocks {
+        &self.blocks
     }
 
     /// The status its shell's last command ended with.
@@ -252,6 +267,14 @@ impl TerminalView {
         cx.notify();
     }
 
+    /// Posts a notification when a command ran long enough and the session is unseen.
+    fn post_long(&mut self, cx: &mut Context<Self>) {
+        let Some(body) = self.blocks.last_finished().and_then(completion) else {
+            return;
+        };
+        self.post(body, None, cx);
+    }
+
     fn handle(&mut self, events: Vec<PtyEvent>, cx: &mut Context<Self>) {
         let drawn = events
             .iter()
@@ -266,15 +289,23 @@ impl TerminalView {
                 PtyEvent::Mouse(mode) => self.mouse = mode,
                 #[cfg(windows)]
                 PtyEvent::Win32(on) => self.win32 = on,
-                PtyEvent::Mark(Mark::Done(status)) => self.finished(status, cx),
-                // A new prompt ends what was working, waiting or idle; done and error stay.
-                PtyEvent::Mark(Mark::Prompt(click)) => {
-                    self.shell = Shell::Prompting(click);
-                    self.records.prompt();
-                    self.restate(cx);
+                PtyEvent::Mark(mark) => {
+                    self.blocks.mark(mark, Instant::now());
+                    match mark {
+                        Mark::Done(status) => {
+                            self.finished(status, cx);
+                            self.post_long(cx);
+                        }
+                        // A new prompt ends what was working, waiting or idle; done and error stay.
+                        Mark::Prompt(click) => {
+                            self.shell = Shell::Prompting(click);
+                            self.records.prompt();
+                            self.restate(cx);
+                        }
+                        Mark::Output => (self.ran, self.shell) = (true, Shell::Busy),
+                        Mark::Input => self.shell = self.shell.reads(),
+                    }
                 }
-                PtyEvent::Mark(Mark::Output) => (self.ran, self.shell) = (true, Shell::Busy),
-                PtyEvent::Mark(Mark::Input) => self.shell = self.shell.reads(),
                 PtyEvent::Status(status) => {
                     self.status(status);
                     self.restate(cx);

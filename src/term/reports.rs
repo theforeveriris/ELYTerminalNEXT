@@ -168,7 +168,7 @@ impl TerminalView {
     }
 
     /// Posts `body` while the window is not active or the session hidden, one every 3 seconds at most.
-    fn post(&mut self, body: String, asked: Option<&Notice>, cx: &mut Context<Self>) {
+    pub(super) fn post(&mut self, body: String, asked: Option<&Notice>, cx: &mut Context<Self>) {
         let pid = self.pty.pid;
         if !unseen(self.front, self.active) {
             log::debug!("terminal {pid}: in view, so it posts no {body:?}");

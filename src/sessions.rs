@@ -13,7 +13,7 @@ use ely_gpui_component::{
 use gpui::{AnyElement, App, Entity, SharedString, Subscription, div, prelude::*, rems};
 
 use crate::{
-    term::{Kind, Record, Records, State, TerminalView},
+    term::{Block, Kind, Record, Records, State, TerminalView},
     workspace::{TITLE, Workspace},
 };
 
@@ -97,6 +97,18 @@ pub fn one_line(text: &str) -> String {
         .collect()
 }
 
+/// What a row's description adds for a block: how long it ran and, when it failed, its status.
+pub fn block_note(block: &Block) -> Option<String> {
+    let mut note = String::new();
+    if let Some(duration) = block.duration() {
+        note.push_str(&format!(" · {:.1}s", duration.as_secs_f64()));
+    }
+    if let Some(status) = block.status().filter(|status| *status != 0) {
+        note.push_str(&format!(" · exit {status}"));
+    }
+    (!note.is_empty()).then_some(note)
+}
+
 /// The session shown once session `closed` of `left + 1` is gone, `active` having been shown.
 pub fn after_close(active: usize, closed: usize, left: usize) -> usize {
     if closed < active || active == left {
@@ -118,10 +130,14 @@ pub fn row(
 ) -> ListItem {
     let terminal = session.terminal.read(cx);
     let pid = terminal.pid() as usize;
+    let mut description = shown(&session.folder, home);
+    if let Some(note) = terminal.blocks().last_finished().and_then(block_note) {
+        description.push_str(&note);
+    }
     let (select, close) = (workspace.clone(), workspace.clone());
     let editing = session.editing.is_some();
     let item = ListItem::new(("session", pid), session.named().to_string())
-        .description(shown(&session.folder, home))
+        .description(description)
         .selected(active)
         .strong(session.bell || session.waiting)
         // A press in the field it renames with stays the field's.
@@ -343,6 +359,40 @@ mod tests {
             shown("/Users/ely/line\nbreak"),
             format!("~{MAIN_SEPARATOR}line␊break")
         );
+    }
+
+    #[test]
+    fn a_row_notes_how_the_last_command_went() {
+        use crate::term::Phase;
+        use std::time::{Duration, Instant};
+        let start = Instant::now();
+        let block = |phase, command_at, ended| Block {
+            id: 0,
+            phase,
+            started: start,
+            command_at,
+            ended,
+        };
+        let done = block(
+            Phase::Done(Some(0)),
+            Some(start),
+            Some(start + Duration::from_millis(1500)),
+        );
+        assert_eq!(block_note(&done).as_deref(), Some(" · 1.5s"));
+        let failed = block(
+            Phase::Done(Some(2)),
+            Some(start),
+            Some(start + Duration::from_millis(200)),
+        );
+        assert_eq!(block_note(&failed).as_deref(), Some(" · 0.2s · exit 2"));
+        let running = block(Phase::Running, Some(start), None);
+        assert_eq!(block_note(&running), None);
+        let prompted = block(
+            Phase::Done(Some(1)),
+            None,
+            Some(start + Duration::from_secs(1)),
+        );
+        assert_eq!(block_note(&prompted).as_deref(), Some(" · exit 1"));
     }
 
     #[test]
