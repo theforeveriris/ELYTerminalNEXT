@@ -103,6 +103,8 @@
 - **SHELL-02**：启动后在后台向每个 shell 询问版本（PowerShell 5.1/7、bash、cmd、WSL、nu 等），设置里的 shell 列表显示成 `Name (version)`。
 - **TAB-26**：主窗口的大小与位置都写进设置；恢复时限制在主屏可见区域内，屏幕变化不会把窗口留在外面。
 - **会话恢复（v0.3 草案的第一步）**：标签名与每个标签的当前 cwd 写入 `session.json`（原子替换，最多 16 个标签）；启动时按设置恢复标签并回到上次的标签；Terminal 设置里可关闭恢复。
+- **TAB-08**：`Ctrl+Tab` / `Ctrl+Shift+Tab` 按最近使用切换标签；顺序切换移到 `Ctrl+PageDown` / `Ctrl+PageUp`。
+- **FIND-06**：滚动条上以细线标出搜索命中的历史位置，当前结果仍在主屏高亮。
 
 ---
 
