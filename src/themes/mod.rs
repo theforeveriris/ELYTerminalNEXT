@@ -1,5 +1,6 @@
 mod chrome;
 pub mod custom;
+pub mod import;
 #[cfg(target_os = "linux")]
 pub mod omarchy;
 

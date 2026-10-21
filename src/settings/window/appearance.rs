@@ -8,8 +8,8 @@ use ely_gpui_component::{
     theme::{ActiveTheme, ControlSize, Mix, Radius, TextSize},
 };
 use gpui::{
-    App, Context, Div, Entity, Hsla, ParentElement, SharedString, Styled, Window, div, prelude::*,
-    px, relative,
+    App, Context, Div, Entity, Hsla, ParentElement, PathPromptOptions, SharedString, Styled,
+    Window, div, prelude::*, px, relative,
 };
 
 use super::{SettingsWindow, set, switch};
@@ -48,6 +48,17 @@ impl SettingsWindow {
                 this, light, false, settings, window, cx,
             ))
             .row(SettingsRow::new(language::message(cx, "settings.theme.separate")).control(dark));
+        let import = Button::new("import-theme", "Import…")
+            .size(ControlSize::Sm)
+            .on_click({
+                let this = this.clone();
+                move |_, _, cx| import_theme(&this, cx)
+            });
+        themes = themes.row(
+            SettingsRow::new("Theme file")
+                .description("iTerm2 .itermcolors, Windows Terminal JSON, or Ghostty")
+                .control(import),
+        );
         if separate {
             themes = themes.row(super::themegrid::grid(
                 this,
@@ -376,6 +387,62 @@ fn percent(fraction: f32) -> f64 {
 
 fn fraction(percent: f64) -> f32 {
     (percent / 100.) as f32
+}
+
+/// Asks for a theme file, imports its colors into the custom theme, and shows why when it cannot.
+fn import_theme(this: &Entity<SettingsWindow>, cx: &mut App) {
+    let picks = cx.prompt_for_paths(PathPromptOptions {
+        files: true,
+        directories: false,
+        multiple: false,
+        prompt: Some("Import a theme".into()),
+    });
+    let this = this.clone();
+    cx.spawn(async move |cx| {
+        let picked = match picks.await {
+            Ok(Ok(Some(paths))) => paths.into_iter().next(),
+            Ok(Ok(None)) => return,
+            Ok(Err(error)) => {
+                log::warn!("themes: the picker failed: {error:#}");
+                return;
+            }
+            Err(error) => {
+                log::warn!("themes: the picker closed: {error}");
+                return;
+            }
+        };
+        let Some(path) = picked else {
+            return;
+        };
+        let imported = themes::import::read(&path);
+        let failed = match imported {
+            Ok(colors) => {
+                let saved = cx.update(|cx| {
+                    SettingsStore::update(cx, |settings| {
+                        settings.custom_colors = colors;
+                        settings.theme = themes::CUSTOM.into();
+                    })
+                });
+                match saved {
+                    Ok(()) => {
+                        log::info!("themes: imported {}", path.display());
+                        None
+                    }
+                    Err(error) => Some(format!("{error:#}").into()),
+                }
+            }
+            Err(error) => {
+                log::warn!("themes: {} does not import: {error:#}", path.display());
+                Some(format!("{error:#}").into())
+            }
+        };
+        this.update(cx, |this, cx| {
+            this.failed = failed;
+            this.drafts += 1;
+            cx.notify();
+        });
+    })
+    .detach();
 }
 
 /// A small window in `theme`'s colors: the sessions strip, then a prompt, its output and the cursor.
