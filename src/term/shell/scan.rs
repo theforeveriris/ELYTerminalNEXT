@@ -3,7 +3,7 @@
 use std::{
     collections::HashSet,
     env,
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf, Prefix},
     process::Command,
 };
 
@@ -460,6 +460,42 @@ fn on_path(name: &str) -> Option<PathBuf> {
         .filter(|folder| folder.is_absolute())
         .map(|folder| folder.join(name))
         .find(|file| file.is_file())
+}
+
+/// A Windows path as WSL reads it: `C:\x` is `/mnt/c/x`, and a WSL share is its own folder.
+pub fn wsl_path(path: &Path) -> Option<String> {
+    let text = path.to_str()?;
+    for share in [r"\\wsl.localhost\", r"\\wsl$\"] {
+        if let Some(rest) = text.strip_prefix(share) {
+            let (_, folder) = rest.split_once('\\')?;
+            return Some(format!("/{}", folder.replace('\\', "/")));
+        }
+    }
+    let mut parts = path.components();
+    let Some(Component::Prefix(prefix)) = parts.next() else {
+        return path.is_absolute().then(|| forward(path));
+    };
+    let Prefix::Disk(letter) = prefix.kind() else {
+        return None;
+    };
+    let mut out = format!("/mnt/{}", letter.to_ascii_lowercase() as char);
+    let mut rooted = false;
+    for part in parts {
+        match part {
+            Component::RootDir => rooted = true,
+            Component::Normal(name) => {
+                out.push('/');
+                out.push_str(&name.to_string_lossy());
+            }
+            _ => return None,
+        }
+    }
+    rooted.then_some(out)
+}
+
+/// `path` with the separators a POSIX shell on Windows reads.
+pub fn forward(path: &Path) -> String {
+    path.to_string_lossy().replace('\\', "/")
 }
 
 /// What `program` writes to its standard output, as text, or none when it does not start.
