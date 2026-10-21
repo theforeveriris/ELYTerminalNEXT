@@ -3,6 +3,7 @@ use std::{
     io::{ErrorKind, Write},
     path::{Path, PathBuf},
     sync::atomic::{AtomicU64, Ordering},
+    time::SystemTime,
 };
 
 use anyhow::Context as _;
@@ -14,6 +15,8 @@ use super::Settings;
 pub struct SettingsStore {
     settings: Settings,
     path: PathBuf,
+    /// When the file last changed, as the store last read it.
+    modified: Option<SystemTime>,
 }
 
 impl Global for SettingsStore {}
@@ -26,7 +29,11 @@ impl SettingsStore {
         let settings = load(&path)?;
         fonts(&settings, cx)
             .with_context(|| format!("settings: {} holds a bad value", path.display()))?;
-        cx.set_global(Self { settings, path });
+        cx.set_global(Self {
+            settings,
+            modified: stamp(&path),
+            path,
+        });
         Ok(())
     }
 
@@ -49,9 +56,46 @@ impl SettingsStore {
             fonts(&next, cx)?;
         }
         save(&store.path, &next)?;
-        cx.global_mut::<Self>().settings = next;
+        let modified = stamp(&store.path);
+        let store = cx.global_mut::<Self>();
+        store.settings = next;
+        store.modified = modified;
         Ok(())
     }
+
+    /// Loads the file again when another program changed it; true when the settings changed.
+    pub fn reload(cx: &mut App) -> anyhow::Result<bool> {
+        let (path, before) = {
+            let store = cx.global::<Self>();
+            (store.path.clone(), store.modified)
+        };
+        let modified = stamp(&path);
+        if modified == before {
+            return Ok(false);
+        }
+        let loaded = load(&path).and_then(|settings| {
+            fonts(&settings, cx)?;
+            Ok(settings)
+        });
+        match loaded {
+            Ok(settings) => {
+                let store = cx.global_mut::<Self>();
+                store.settings = settings;
+                store.modified = modified;
+                Ok(true)
+            }
+            Err(error) => {
+                // The file is bad; it is read again when it changes, not on every tick.
+                cx.global_mut::<Self>().modified = modified;
+                Err(error)
+            }
+        }
+    }
+}
+
+/// When `path` last changed, or none when it does not exist.
+fn stamp(path: &Path) -> Option<SystemTime> {
+    fs::metadata(path).and_then(|meta| meta.modified()).ok()
 }
 
 /// Checks the terminal can load its family and each fallback; the error names the field.
@@ -158,6 +202,24 @@ mod tests {
     fn no_file_gives_defaults() {
         let path = folder("none").join("settings.json");
         assert_eq!(load(&path).expect("defaults"), Settings::default());
+    }
+
+    #[test]
+    fn a_stamp_follows_the_file_it_names() {
+        let folder = folder("stamp");
+        fs::create_dir_all(&folder).expect("a test folder");
+        let path = folder.join("settings.json");
+        assert_eq!(stamp(&path), None, "no file, no stamp");
+        fs::write(&path, "{}").expect("a file");
+        let when = SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(10);
+        fs::File::options()
+            .write(true)
+            .open(&path)
+            .expect("the file")
+            .set_modified(when)
+            .expect("a stamp");
+        assert_eq!(stamp(&path), Some(when));
+        fs::remove_dir_all(folder).expect("cleanup");
     }
 
     #[test]

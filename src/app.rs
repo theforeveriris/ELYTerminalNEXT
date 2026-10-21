@@ -46,6 +46,20 @@ pub fn start(cx: &mut App) -> anyhow::Result<()> {
         );
     }
     SettingsStore::init(cx)?;
+    // An editor's save lands without a restart; a bad file keeps the settings in force.
+    cx.spawn(async move |cx| {
+        loop {
+            cx.background_executor()
+                .timer(Duration::from_millis(700))
+                .await;
+            cx.update(|cx| match SettingsStore::reload(cx) {
+                Ok(true) => log::info!("settings: the file changed; the window follows"),
+                Ok(false) => {}
+                Err(error) => log::warn!("settings: the file stays as it was: {error:#}"),
+            });
+        }
+    })
+    .detach();
     updates::start(cx);
     ShellIntegration::init(cx)?;
     let hosts = ssh::default_config().map_or_else(ssh::Hosts::default, |path| ssh::read(&path));
