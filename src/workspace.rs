@@ -45,7 +45,9 @@ actions!(
         LastTab,
         SplitRight,
         SplitDown,
-        ClosePane
+        ClosePane,
+        ZoomPane,
+        Zen
     ]
 );
 
@@ -95,6 +97,11 @@ pub fn bind_keys(cx: &mut App) {
             "ctrl-shift-alt",
         )
     };
+    let (zoom, zen) = if cfg!(target_os = "macos") {
+        ("cmd-shift-enter", "cmd-shift-z")
+    } else {
+        ("ctrl-shift-enter", "ctrl-shift-z")
+    };
     let context = Some(CONTEXT);
     cx.bind_keys([
         KeyBinding::new(sessions, ToggleSessions, context),
@@ -107,6 +114,8 @@ pub fn bind_keys(cx: &mut App) {
         KeyBinding::new(split, SplitRight, context),
         KeyBinding::new(split_down, SplitDown, context),
         KeyBinding::new(&format!("{pane}-w"), ClosePane, context),
+        KeyBinding::new(zoom, ZoomPane, context),
+        KeyBinding::new(zen, Zen, context),
     ]);
     cx.bind_keys([
         KeyBinding::new(new, NewSession, context),
@@ -159,6 +168,10 @@ pub struct Workspace {
     ticking: Option<Task<()>>,
     /// The next id a session takes, so an id is never reused.
     next_id: SessionId,
+    /// The session whose pane fills the window, while one does.
+    zoom: Option<SessionId>,
+    /// Whether both columns step aside for the terminal.
+    zen: bool,
     _settings: Subscription,
     _acted: Subscription,
 }
@@ -193,6 +206,8 @@ impl Workspace {
             dragged: Dragged::default(),
             ticking: None,
             next_id: 1,
+            zoom: None,
+            zen: false,
             _settings: cx.observe_global_in::<SettingsStore>(window, |this, window, cx| {
                 this.background.follow(window, SettingsStore::get(cx));
                 cx.notify();
@@ -377,6 +392,9 @@ impl Workspace {
         self.files.update(cx, |files, cx| files.show(&folder, cx));
         self.git.update(cx, |git, cx| git.show(&folder, cx));
         self.active = id;
+        if self.zoom.is_some() {
+            self.zoom = Some(id);
+        }
         log::debug!("app: session {id} shown");
         self.retitle(window);
         cx.notify();
@@ -391,6 +409,9 @@ impl Workspace {
             .session(id)
             .map(|session| session.terminal.read(cx).pid());
         log::info!("app: session {id} closes");
+        if self.zoom == Some(id) {
+            self.zoom = None;
+        }
         // The session leaves the list, and every pane that held it.
         self.sessions.retain(|session| session.id != id);
         for tab in &mut self.tabs {
@@ -473,6 +494,7 @@ impl Workspace {
 
     /// Shows or hides a side column, as the settings keep it.
     fn toggle(&mut self, flip: fn(&mut Settings), cx: &mut Context<Self>) {
+        self.zen = false;
         match SettingsStore::update(cx, flip) {
             Ok(()) => {
                 let settings = SettingsStore::get(cx);
@@ -484,6 +506,34 @@ impl Workspace {
                 );
             }
             Err(error) => log::error!("app: the columns stay: {error:#}"),
+        }
+    }
+
+    /// Fills the window with the shown pane, or gives the grid back.
+    pub fn toggle_zoom(&mut self, cx: &mut Context<Self>) {
+        match self.zoom.take() {
+            Some(id) => log::info!("app: pane {id} gives the grid back"),
+            None => {
+                self.zoom = Some(self.active);
+                log::info!("app: pane {} fills the window", self.active);
+            }
+        }
+        cx.notify();
+    }
+
+    /// Hides both columns for the terminal, or shows them as the settings keep them.
+    pub fn toggle_zen(&mut self, cx: &mut Context<Self>) {
+        self.zen = !self.zen;
+        log::info!("app: zen {}", if self.zen { "on" } else { "off" });
+        cx.notify();
+    }
+
+    /// Whether each side column shows now: zen hides both, and otherwise the settings decide.
+    fn columns(&self, settings: &Settings) -> (bool, bool) {
+        if self.zen {
+            (false, false)
+        } else {
+            (settings.show_sessions, settings.show_panel)
         }
     }
 

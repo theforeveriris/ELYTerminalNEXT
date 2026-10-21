@@ -66,6 +66,11 @@ impl Tab {
         self.panes.iter().map(|pane| pane.session).collect()
     }
 
+    /// Whether one of its panes holds `session`.
+    pub fn holds(&self, session: SessionId) -> bool {
+        self.panes.iter().any(|pane| pane.session == session)
+    }
+
     /// Gives the focus to the pane at `index`.
     pub fn focus(&mut self, index: usize) {
         if index < self.panes.len() {
@@ -179,6 +184,15 @@ pub enum Direction {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_tab_holds_the_sessions_of_its_panes() {
+        let mut tab = Tab::new(3);
+        assert!(tab.holds(3));
+        assert!(!tab.holds(4));
+        tab.split(true, 4);
+        assert!(tab.holds(3) && tab.holds(4));
+    }
 
     #[test]
     fn a_new_tab_holds_one_pane_with_the_focus() {

@@ -18,7 +18,7 @@ use gpui::{
 use super::{
     CONTEXT, ClosePane, CloseSession, CloseTab, FocusPane, LastSession, LastTab, NewSession,
     NewTab, NextSession, NextTab, PreviousSession, PreviousTab, SelectSession, SelectTab, Side,
-    SplitDown, SplitRight, TogglePanel, ToggleSessions, Workspace,
+    SplitDown, SplitRight, TogglePanel, ToggleSessions, Workspace, Zen, ZoomPane,
 };
 use crate::menus;
 use crate::sessions::{self, Session};
@@ -152,6 +152,12 @@ impl Workspace {
         let Some(tab) = self.tab() else {
             return div().size_full();
         };
+        if let Some(id) = self.zoom
+            && tab.holds(id)
+            && let Some(session) = self.session(id)
+        {
+            return div().size_full().child(session.terminal.clone());
+        }
         let rows = tab.rows();
         let mut out = div().flex().flex_col().size_full();
         for row in rows {
@@ -187,6 +193,7 @@ impl Render for Workspace {
         let now = Instant::now();
         self.tick(now, cx);
         let settings = SettingsStore::get(cx);
+        let (show_sessions, show_panel) = self.columns(settings);
         let workspace = cx.entity();
         let tip =
             |shown: bool, what: &str| format!("{} {what}", if shown { "Hide" } else { "Show" });
@@ -194,13 +201,13 @@ impl Render for Workspace {
         let left = column_toggle(
             &workspace,
             ("toggle-sessions", IconName::PanelLeft),
-            tip(settings.show_sessions, "sessions"),
+            tip(show_sessions, "sessions"),
             |settings| settings.show_sessions = !settings.show_sessions,
         );
         let right = column_toggle(
             &workspace,
             ("toggle-panel", IconName::PanelRight),
-            tip(settings.show_panel, "Git and Files"),
+            tip(show_panel, "Git and Files"),
             |settings| settings.show_panel = !settings.show_panel,
         );
         // No menu bar off macOS: a gear opens Settings.
@@ -221,7 +228,7 @@ impl Render for Workspace {
         let mut terminal = ShellColumn::new("terminal")
             .title(self.title().to_string())
             .child(self.panes());
-        if settings.show_sessions {
+        if show_sessions {
             let adder = workspace.clone();
             let new = IconButton::new("new-tab", IconName::Plus)
                 .variant(ButtonVariant::Ghost)
@@ -248,7 +255,7 @@ impl Render for Workspace {
         } else {
             terminal = terminal.leading(left);
         }
-        if settings.show_panel {
+        if show_panel {
             let tab = settings.panel;
             let chosen = match tab {
                 PanelTab::Git => "git",
@@ -346,6 +353,8 @@ impl Render for Workspace {
             .on_action(cx.listener(|this, _: &SplitRight, window, cx| this.split(true, window, cx)))
             .on_action(cx.listener(|this, _: &SplitDown, window, cx| this.split(false, window, cx)))
             .on_action(cx.listener(|this, _: &ClosePane, window, cx| this.close_pane(window, cx)))
+            .on_action(cx.listener(|this, _: &ZoomPane, _, cx| this.toggle_zoom(cx)))
+            .on_action(cx.listener(|this, _: &Zen, _, cx| this.toggle_zen(cx)))
             .on_action(cx.listener(|this, focus: &FocusPane, window, cx| {
                 this.focus_pane(focus.0, window, cx)
             }))
