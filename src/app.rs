@@ -4,7 +4,7 @@ use anyhow::Context as _;
 use ely_gpui_component::theme::ActiveTheme;
 use gpui::{
     App, AppContext, Bounds, Context, Pixels, Size, Task, TitlebarOptions, Window, WindowBounds,
-    WindowDecorations, WindowHandle, WindowOptions, px, size,
+    WindowDecorations, WindowHandle, WindowOptions, point, px, size,
 };
 
 #[cfg(target_os = "macos")]
@@ -135,10 +135,9 @@ pub fn start(cx: &mut App) -> anyhow::Result<()> {
 
 /// Opens the main window running `launch`.
 pub fn open(launch: Launch, cx: &mut App) -> anyhow::Result<WindowHandle<Workspace>> {
-    let kept = opening_size(cx);
+    let bounds = opening_bounds(cx);
     // macOS grows a window by a point on a side whose edge falls on a half point.
-    let centered = Bounds::centered(None, kept, cx);
-    let bounds = Bounds::new(centered.origin.map(|at| at.round()), kept);
+    let bounds = Bounds::new(bounds.origin.map(|at| at.round()), bounds.size);
     let background = blur::appearance(SettingsStore::get(cx));
     let least = px(*settings::WINDOW.start());
     let options = WindowOptions {
@@ -169,11 +168,43 @@ pub fn open(launch: Launch, cx: &mut App) -> anyhow::Result<WindowHandle<Workspa
     crate::pet::follow(window, cx);
     log::info!(
         "app: main window open at {} by {}, blur: {background:?} on {}",
-        f32::from(kept.width),
-        f32::from(kept.height),
+        f32::from(bounds.size.width),
+        f32::from(bounds.size.height),
         std::env::consts::OS
     );
     Ok(window)
+}
+
+/// The kept size and position, within the primary display's visible area where that is known.
+fn opening_bounds(cx: &App) -> Bounds<Pixels> {
+    let size = opening_size(cx);
+    let settings = SettingsStore::get(cx);
+    let Some(display) = cx.primary_display() else {
+        return Bounds::centered(None, size, cx);
+    };
+    let Some((x, y)) = settings.window_x.zip(settings.window_y) else {
+        return Bounds::centered(None, size, cx);
+    };
+    let room = display.visible_bounds();
+    let (x, y) = clamp_origin(
+        (x, y),
+        (f32::from(size.width), f32::from(size.height)),
+        (
+            f32::from(room.origin.x),
+            f32::from(room.origin.y),
+            f32::from(room.size.width),
+            f32::from(room.size.height),
+        ),
+    );
+    Bounds::new(point(px(x), px(y)), size)
+}
+
+/// `at` within `room`, a left, top, width and height, keeping `size`'s window wholly inside.
+fn clamp_origin(at: (f32, f32), size: (f32, f32), room: (f32, f32, f32, f32)) -> (f32, f32) {
+    let (left, top, width, height) = room;
+    let right = (left + width - size.0).max(left);
+    let bottom = (top + height - size.1).max(top);
+    (at.0.clamp(left, right), at.1.clamp(top, bottom))
 }
 
 /// The kept size, within the primary display's visible area where that is known.
@@ -211,17 +242,23 @@ fn keep_size(window: &mut Window, cx: &mut Context<Workspace>) {
                     );
                     return Ok(());
                 }
-                let area = window.window_bounds().get_bounds().size;
+                let area = window.window_bounds().get_bounds();
                 let (width, height) = (
-                    f32::from(area.width).round(),
-                    f32::from(area.height).round(),
+                    f32::from(area.size.width).round(),
+                    f32::from(area.size.height).round(),
+                );
+                let (x, y) = (
+                    f32::from(area.origin.x).round(),
+                    f32::from(area.origin.y).round(),
                 );
                 SettingsStore::update(cx, |settings| {
                     settings.window_width = width;
                     settings.window_height = height;
+                    settings.window_x = Some(x);
+                    settings.window_y = Some(y);
                 })
                 .with_context(|| {
-                    format!("app: the window's size, {width} by {height}, is not kept")
+                    format!("app: the window's size and place, {width} by {height} at {x},{y}, are not kept")
                 })
             });
             match kept {
@@ -243,3 +280,6 @@ fn keep_size(window: &mut Window, cx: &mut Context<Workspace>) {
     })
     .detach();
 }
+
+#[cfg(test)]
+mod tests;

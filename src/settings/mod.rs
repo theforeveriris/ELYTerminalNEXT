@@ -104,6 +104,9 @@ pub struct Settings {
     /// The main window's size, unmaximized, in pixels.
     pub window_width: f32,
     pub window_height: f32,
+    /// Where the main window's top-left sat, unmaximized; none centers it.
+    pub window_x: Option<f32>,
+    pub window_y: Option<f32>,
     /// The language of the interface; the system's by default.
     pub language: Language,
     /// The colors of the theme of the user's own.
@@ -143,6 +146,8 @@ impl Default for Settings {
             panel_width: 240.0,
             window_width: 1200.0,
             window_height: 760.0,
+            window_x: None,
+            window_y: None,
             language: Language::default(),
             custom_colors: themes::Colors::default(),
         }
@@ -156,6 +161,7 @@ pub const PADDING: RangeInclusive<f32> = 0.0..=64.0;
 pub const SCROLLBACK: RangeInclusive<u32> = 0..=100_000;
 pub const COLUMN: RangeInclusive<f32> = 160.0..=960.0;
 pub const WINDOW: RangeInclusive<f32> = 100.0..=16384.0;
+pub const WINDOW_POS: RangeInclusive<f32> = -32768.0..=32768.0;
 pub const ELY_LEFT: RangeInclusive<f32> = 0.0..=16384.0;
 
 impl Settings {
@@ -197,6 +203,12 @@ impl Settings {
         within("panel_width", self.panel_width, &COLUMN)?;
         within("window_width", self.window_width, &WINDOW)?;
         within("window_height", self.window_height, &WINDOW)?;
+        if let Some(x) = self.window_x {
+            within("window_x", x, &WINDOW_POS)?;
+        }
+        if let Some(y) = self.window_y {
+            within("window_y", y, &WINDOW_POS)?;
+        }
         within("ely_left", self.ely_left, &ELY_LEFT)?;
         for (field, id) in [
             ("theme", Some(&self.theme)),

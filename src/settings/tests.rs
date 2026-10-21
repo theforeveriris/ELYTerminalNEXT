@@ -58,6 +58,23 @@ fn defaults_are_valid() {
 }
 
 #[test]
+fn a_window_place_out_of_range_names_its_field() {
+    let settings = Settings {
+        window_x: Some(40_000.0),
+        window_y: None,
+        ..Settings::default()
+    };
+    let error = settings.validate().expect_err("too far right");
+    assert_eq!(
+        error.to_string(),
+        "window_x is 40000, outside -32768 to 32768"
+    );
+    let older: Settings =
+        serde_json::from_str(r#"{"window_width":1200.0,"window_height":760.0}"#).expect("parses");
+    assert_eq!((older.window_x, older.window_y), (None, None));
+}
+
+#[test]
 fn a_value_out_of_range_names_its_field() {
     let settings = Settings {
         line_height: 2.5,
