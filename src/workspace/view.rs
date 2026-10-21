@@ -117,6 +117,28 @@ impl Workspace {
                 rows.push(row.into_any_element());
             }
         }
+        let hosts = cx.global::<crate::ssh::Hosts>();
+        if !hosts.hosts.is_empty() {
+            rows.push(
+                div()
+                    .px_2()
+                    .pt_3()
+                    .child(Caption::new("Remote"))
+                    .into_any_element(),
+            );
+            for (at, host) in hosts.hosts.iter().enumerate() {
+                let connect = workspace.clone();
+                let name = host.name.clone();
+                rows.push(
+                    ListItem::new(("ssh", at), host.name.clone())
+                        .description(host.summary())
+                        .on_click(move |_, window, cx| {
+                            connect.update(cx, |this, cx| this.connect(name.clone(), window, cx))
+                        })
+                        .into_any_element(),
+                );
+            }
+        }
         div()
             .id("tabs")
             .size_full()

@@ -33,7 +33,7 @@ mod win32;
 pub mod zoom;
 
 pub use blocks::{Block, Blocks, Phase};
-pub use drop::Quote;
+pub use drop::{Quote, Target};
 pub use fonts::{ICONS, MONO, load_font};
 pub use pty::{Events, Launch, Listener, Pty, PtyEvent, config, fit, spawn};
 pub use status::{Kind, Record, Records, State};

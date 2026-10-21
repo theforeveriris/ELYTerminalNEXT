@@ -6,7 +6,7 @@ use super::Workspace;
 use super::layout::{Direction, SessionId, Tab};
 use crate::settings::SettingsStore;
 use crate::term::shell::{ShellIntegration, launch};
-use crate::term::{config, spawn};
+use crate::term::{Launch, Quote, Target, config, spawn};
 
 impl Workspace {
     /// The sessions in the order the keys walk them: the shown tab's panes first, then the other tabs'.
@@ -34,6 +34,43 @@ impl Workspace {
         self.active_tab = self.tabs.len() - 1;
         self.select(id, window, cx);
         log::info!("app: tab {} opens", self.active_tab + 1);
+    }
+
+    /// Opens a tab on `host`, running the ssh the system has.
+    pub fn connect(&mut self, host: String, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(home) = dirs::home_dir() else {
+            log::error!("app: no home folder, so no ssh to {host}");
+            return;
+        };
+        let ssh = match crate::settings::program_path("ssh") {
+            Ok(ssh) => ssh,
+            Err(error) => {
+                log::error!("app: no ssh to {host}: {error:#}");
+                return;
+            }
+        };
+        let settings = SettingsStore::get(cx).clone();
+        let launch = Launch {
+            program: Some((ssh, vec![host.clone()])),
+            cwd: home,
+            env: Vec::new(),
+            reports: false,
+            quote: Quote::Posix,
+            target: Target::Local,
+        };
+        let started = spawn(&launch, (80, 24), (8, 16), config(&settings));
+        let (pty, events) = match started {
+            Ok(started) => started,
+            Err(error) => {
+                log::error!("app: no ssh to {host}: {error:#}");
+                return;
+            }
+        };
+        let id = self.add(pty, events, launch, window, cx);
+        self.tabs.push(Tab::new(id));
+        self.active_tab = self.tabs.len() - 1;
+        self.select(id, window, cx);
+        log::info!("app: ssh connects to {host}");
     }
 
     /// Closes the tab at `index`; its sessions' programs hang up.
