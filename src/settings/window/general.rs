@@ -1,17 +1,17 @@
 //! The general rows: the language of the interface.
 
 use ely_gpui_component::settings::{SettingsRow, SettingsSection};
-use gpui::{Context, Div, ParentElement, Styled, div};
+use gpui::{App, Div, Entity, ParentElement, Styled, div};
 
 use super::SettingsWindow;
 use crate::settings::{Language, SettingsStore, language};
 
 impl SettingsWindow {
     /// The general page: the language of the interface.
-    pub(super) fn general(&self, cx: &Context<Self>) -> Div {
+    pub(super) fn general(&self, this: &Entity<Self>, cx: &App) -> Div {
         let settings = SettingsStore::get(cx);
         let control = super::choice(
-            &cx.entity(),
+            this,
             "language",
             &[
                 (

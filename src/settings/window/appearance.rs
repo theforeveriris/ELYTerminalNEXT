@@ -22,10 +22,13 @@ use crate::{
 
 impl SettingsWindow {
     /// The theme, font, cursor and window rows.
-    pub(super) fn appearance(&self, window: &Window, cx: &Context<Self>) -> Div {
+    pub(super) fn appearance(&self, this: &Entity<Self>, window: &Window, cx: &App) -> Div {
+        self.appearance_inner(this, window, cx)
+    }
+
+    fn appearance_inner(&self, this: &Entity<Self>, window: &Window, cx: &App) -> Div {
         let settings = SettingsStore::get(cx);
         let theme = cx.theme();
-        let this = cx.entity();
         let separate = settings.dark_theme.is_some();
         let dark = Switch::new("dark_theme", separate).on_change({
             let this = this.clone();
@@ -42,12 +45,12 @@ impl SettingsWindow {
         let light = separate.then(|| language::message(cx, "settings.theme.light"));
         let mut themes = SettingsSection::new(language::message(cx, "settings.theme.section"))
             .row(super::themegrid::grid(
-                &this, light, false, settings, window, cx,
+                this, light, false, settings, window, cx,
             ))
             .row(SettingsRow::new(language::message(cx, "settings.theme.separate")).control(dark));
         if separate {
             themes = themes.row(super::themegrid::grid(
-                &this,
+                this,
                 Some(language::message(cx, "settings.theme.dark")),
                 true,
                 settings,
@@ -78,7 +81,7 @@ impl SettingsWindow {
             });
         let fallbacks = SettingsRow::new(language::message(cx, "settings.font.fallbacks"))
             .description(language::message(cx, "settings.font.fallbacks.hint"))
-            .control(self.fallback_list(cx));
+            .control(self.fallback_list(this, cx));
         let font = SettingsSection::new(language::message(cx, "settings.font.section"))
             .row(
                 SettingsRow::new(language::message(cx, "settings.font.family"))
@@ -87,42 +90,42 @@ impl SettingsWindow {
             .row(fallbacks)
             .row(
                 SettingsRow::new(language::message(cx, "settings.font.size")).control(self.number(
+                    this,
                     "font_size",
                     settings.font_size,
                     &FONT_SIZE,
                     (1.0, 1),
                     |settings, size| settings.font_size = size,
-                    cx,
                 )),
             )
             .row(
                 SettingsRow::new(language::message(cx, "settings.font.height")).control(
                     self.number(
+                        this,
                         "line_height",
                         settings.line_height,
                         &LINE_HEIGHT,
                         (0.05, 2),
                         |settings, height| settings.line_height = height,
-                        cx,
                     ),
                 ),
             )
             .row(
                 SettingsRow::new(language::message(cx, "settings.font.ligatures")).control(switch(
-                    &this,
+                    this,
                     "ligatures",
                     settings.ligatures,
                     |settings, on| settings.ligatures = on,
                 )),
             );
-        let style = super::cursor_style(&this, settings.cursor_style, cx);
+        let style = super::cursor_style(this, settings.cursor_style, cx);
         let active = themes::active(settings, window.appearance(), cx);
         let lit = self.lit || !settings.cursor_blink;
         let cursor = SettingsSection::new(language::message(cx, "settings.cursor.section"))
             .row(SettingsRow::new(language::message(cx, "settings.cursor.style")).control(style))
             .row(
                 SettingsRow::new(language::message(cx, "settings.cursor.blink")).control(switch(
-                    &this,
+                    this,
                     "cursor_blink",
                     settings.cursor_blink,
                     |settings, on| settings.cursor_blink = on,
@@ -163,7 +166,7 @@ impl SettingsWindow {
             )
             .row(
                 SettingsRow::new(language::message(cx, "settings.window.blur")).control(switch(
-                    &this,
+                    this,
                     "background_blur",
                     settings.background_blur,
                     |settings, on| settings.background_blur = on,
@@ -172,29 +175,29 @@ impl SettingsWindow {
             .row(
                 SettingsRow::new(language::message(cx, "settings.window.padding_x")).control(
                     self.number(
+                        this,
                         "padding_x",
                         settings.padding_x,
                         &PADDING,
                         (1.0, 0),
                         |settings, padding| settings.padding_x = padding,
-                        cx,
                     ),
                 ),
             )
             .row(
                 SettingsRow::new(language::message(cx, "settings.window.padding_y")).control(
                     self.number(
+                        this,
                         "padding_y",
                         settings.padding_y,
                         &PADDING,
                         (1.0, 0),
                         |settings, padding| settings.padding_y = padding,
-                        cx,
                     ),
                 ),
             );
         // The editor of the user's own colors shows when that theme is worn.
-        let custom = (settings.theme == themes::CUSTOM).then(|| self.custom(window, cx));
+        let custom = (settings.theme == themes::CUSTOM).then(|| self.custom(this, window, cx));
         div()
             .flex()
             .flex_col()
@@ -216,8 +219,7 @@ impl SettingsWindow {
     }
 
     /// Each fallback family, a picker that replaces it and a button that removes it, then Add or the empty picker it opens.
-    fn fallback_list(&self, cx: &Context<Self>) -> Div {
-        let this = cx.entity();
+    fn fallback_list(&self, this: &Entity<Self>, cx: &App) -> Div {
         let families = SettingsStore::get(cx).font_fallbacks.clone();
         let width = cx.theme().prose_width();
         let row = |index: usize, picker: FontPicker, remove: IconButton| {
@@ -241,7 +243,7 @@ impl SettingsWindow {
         let rows = families.iter().enumerate().map(|(index, family)| {
             let picker = FontPicker::new(keyed(&self.fallbacks[index]), &self.fallbacks[index])
                 .selected(family.clone())
-                .on_change(pick(&this, index));
+                .on_change(pick(this, index));
             let remove = IconButton::new(("remove_fallback", index), IconName::X).on_click({
                 let (this, family) = (this.clone(), family.clone());
                 move |_, window, cx| {
@@ -261,7 +263,7 @@ impl SettingsWindow {
         let next = families.len();
         let add = if self.adding {
             let picker = FontPicker::new(keyed(&self.fallbacks[next]), &self.fallbacks[next])
-                .on_change(pick(&this, next));
+                .on_change(pick(this, next));
             let cancel = IconButton::new("cancel_fallback", IconName::X).on_click({
                 let this = this.clone();
                 move |_, window, cx| {
@@ -301,14 +303,14 @@ impl SettingsWindow {
     /// A field over `range`, by `step` to `places`, that saves each committed number through `put`; a refusal starts it again from the settings.
     fn number(
         &self,
+        this: &Entity<Self>,
         field: &'static str,
         value: f32,
         range: &RangeInclusive<f32>,
         (step, places): (f64, usize),
         put: fn(&mut Settings, f32),
-        cx: &Context<Self>,
     ) -> NumberInput {
-        let this = cx.entity();
+        let this = this.clone();
         NumberInput::new((field, self.drafts), f64::from(value))
             .range(f64::from(*range.start()), f64::from(*range.end()))
             .step(step)
@@ -412,7 +414,7 @@ pub(super) fn preview(theme: &TerminalTheme, cx: &App) -> Div {
     let chrome = cx.theme();
     div()
         .w_full()
-        .aspect_ratio(2.)
+        .h(px(72.))
         .flex()
         .overflow_hidden()
         .rounded(chrome.radius(Radius::Sm))

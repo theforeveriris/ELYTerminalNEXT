@@ -6,9 +6,7 @@ use ely_gpui_component::{
     settings::{KeyboardShortcutsList, SettingsRow, SettingsSection, Shortcut},
     theme::{ActiveTheme, ControlSize},
 };
-use gpui::{
-    Action, App, Context, Div, Entity, KeyContext, ParentElement, SharedString, Styled, div,
-};
+use gpui::{Action, App, Div, Entity, KeyContext, ParentElement, SharedString, Styled, div};
 
 use super::{OpenSettings, SettingsWindow, choice, set, switch};
 use crate::{
@@ -36,9 +34,8 @@ const PLACES: [&str; 8] = [
 
 impl SettingsWindow {
     /// Shell, start in, scrollback, Option as Alt on macOS, copy on select, Ely and updates, then the shortcuts.
-    pub(super) fn terminal(&self, cx: &Context<Self>) -> Div {
+    pub(super) fn terminal(&self, this: &Entity<Self>, cx: &App) -> Div {
         let settings = SettingsStore::get(cx);
-        let this = cx.entity();
         let shell = div()
             .w(cx.theme().prose_width())
             .flex()
@@ -89,7 +86,7 @@ impl SettingsWindow {
         // Off macOS, Alt is always Alt.
         if cfg!(target_os = "macos") {
             let option = choice(
-                &this,
+                this,
                 "option_as_alt",
                 &[
                     (
@@ -121,12 +118,12 @@ impl SettingsWindow {
             );
         }
         let copy = switch(
-            &this,
+            this,
             "copy_on_select",
             settings.copy_on_select,
             |settings, on| settings.copy_on_select = on,
         );
-        let ely = switch(&this, "ely", settings.ely, |settings, on| settings.ely = on);
+        let ely = switch(this, "ely", settings.ely, |settings, on| settings.ely = on);
         let section = section
             .row(SettingsRow::new(language::message(cx, "settings.terminal.copy")).control(copy))
             .row(
@@ -137,7 +134,7 @@ impl SettingsWindow {
             .row(
                 SettingsRow::new(language::message(cx, "settings.terminal.updates"))
                     .description("At start and once a day")
-                    .control(auto_check(&this, settings.check_updates)),
+                    .control(auto_check(this, settings.check_updates)),
             )
             .row(updates_row(cx));
         let keys = SettingsSection::new(language::message(cx, "settings.terminal.shortcuts"))
@@ -212,38 +209,40 @@ fn start_in(this: &Entity<SettingsWindow>, value: &SharedString, cx: &mut App) {
     );
 }
 
-/// The listed commands, in order: group, name and action.
-fn listed() -> Vec<(&'static str, &'static str, Box<dyn Action>)> {
-    let mut listed = vec![
-        ("Sessions", "New session", NewSession.boxed_clone()),
-        ("Sessions", "Close session", CloseSession.boxed_clone()),
-        ("Sessions", "Next session", NextSession.boxed_clone()),
-        (
-            "Sessions",
-            "Previous session",
-            PreviousSession.boxed_clone(),
-        ),
-    ];
-    let places = PLACES.iter().enumerate();
-    listed.extend(places.map(|(ix, name)| ("Sessions", *name, SelectSession(ix).boxed_clone())));
-    listed.extend([
-        ("Sessions", "Last session", LastSession.boxed_clone()),
-        ("Edit", "Copy", Copy.boxed_clone()),
-        ("Edit", "Paste", Paste.boxed_clone()),
-        ("Edit", "Select all", SelectAll.boxed_clone()),
-        ("Edit", "Find", Find.boxed_clone()),
-        ("View", "Previous prompt", PreviousPrompt.boxed_clone()),
-        ("View", "Next prompt", NextPrompt.boxed_clone()),
-        ("View", "Toggle sessions", ToggleSessions.boxed_clone()),
-        ("View", "Toggle right panel", TogglePanel.boxed_clone()),
-        ("View", "Bigger", Bigger.boxed_clone()),
-        ("View", "Smaller", Smaller.boxed_clone()),
-        ("View", "Reset size", ResetSize.boxed_clone()),
-        ("App", "Settings", OpenSettings.boxed_clone()),
-        ("App", "Minimize", Minimize.boxed_clone()),
-        ("App", "Quit", Quit.boxed_clone()),
-    ]);
-    listed
+// The listed commands, in order: group, name and action. Built once, as each action is a heap.
+thread_local! {
+    static LISTED: Vec<(&'static str, &'static str, Box<dyn Action>)> = {
+        let mut listed = vec![
+            ("Sessions", "New session", NewSession.boxed_clone()),
+            ("Sessions", "Close session", CloseSession.boxed_clone()),
+            ("Sessions", "Next session", NextSession.boxed_clone()),
+            (
+                "Sessions",
+                "Previous session",
+                PreviousSession.boxed_clone(),
+            ),
+        ];
+        let places = PLACES.iter().enumerate();
+        listed.extend(places.map(|(ix, name)| ("Sessions", *name, SelectSession(ix).boxed_clone())));
+        listed.extend([
+            ("Sessions", "Last session", LastSession.boxed_clone()),
+            ("Edit", "Copy", Copy.boxed_clone()),
+            ("Edit", "Paste", Paste.boxed_clone()),
+            ("Edit", "Select all", SelectAll.boxed_clone()),
+            ("Edit", "Find", Find.boxed_clone()),
+            ("View", "Previous prompt", PreviousPrompt.boxed_clone()),
+            ("View", "Next prompt", NextPrompt.boxed_clone()),
+            ("View", "Toggle sessions", ToggleSessions.boxed_clone()),
+            ("View", "Toggle right panel", TogglePanel.boxed_clone()),
+            ("View", "Bigger", Bigger.boxed_clone()),
+            ("View", "Smaller", Smaller.boxed_clone()),
+            ("View", "Reset size", ResetSize.boxed_clone()),
+            ("App", "Settings", OpenSettings.boxed_clone()),
+            ("App", "Minimize", Minimize.boxed_clone()),
+            ("App", "Quit", Quit.boxed_clone()),
+        ]);
+        listed
+    };
 }
 
 /// Each listed command's keys in the main window's terminal, a line per binding, from the keymap.
@@ -253,25 +252,27 @@ fn shortcuts(cx: &App) -> Vec<Shortcut> {
     let keymap = cx.key_bindings();
     let keymap = keymap.borrow();
     let mut shortcuts = Vec::new();
-    for (group, name, action) in listed() {
-        for binding in keymap.bindings_for_action(action.as_ref()) {
-            // gpui matches a binding at any depth of the context stack.
-            let applies = binding.predicate().is_none_or(|predicate| {
-                (1..=stack.len()).any(|depth| predicate.eval(&stack[..depth]))
-            });
-            if applies {
-                let strokes: Vec<String> = binding
-                    .keystrokes()
-                    .iter()
-                    .map(|key| key.unparse())
-                    .collect();
-                shortcuts.push(Shortcut {
-                    group: group.into(),
-                    name: name.into(),
-                    keys: strokes.join(" ").into(),
+    LISTED.with(|listed| {
+        for (group, name, action) in listed {
+            for binding in keymap.bindings_for_action(action.as_ref()) {
+                // gpui matches a binding at any depth of the context stack.
+                let applies = binding.predicate().is_none_or(|predicate| {
+                    (1..=stack.len()).any(|depth| predicate.eval(&stack[..depth]))
                 });
+                if applies {
+                    let strokes: Vec<String> = binding
+                        .keystrokes()
+                        .iter()
+                        .map(|key| key.unparse())
+                        .collect();
+                    shortcuts.push(Shortcut {
+                        group: (*group).into(),
+                        name: (*name).into(),
+                        keys: strokes.join(" ").into(),
+                    });
+                }
             }
         }
-    }
+    });
     shortcuts
 }

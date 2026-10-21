@@ -10,10 +10,11 @@ use ely_gpui_component::{
     theme::{ActiveTheme, ControlSize, IconSize},
 };
 use gpui::{
-    App, AppContext, Bounds, Context, Entity, FocusHandle, InteractiveElement, IntoElement,
-    KeyBinding, ParentElement, Render, SharedString, StatefulInteractiveElement, Styled,
-    Subscription, Task, TitlebarOptions, Window, WindowBounds, WindowDecorations, WindowOptions,
-    actions, div, prelude::FluentBuilder, px, size,
+    AnyElement, App, AppContext, Bounds, Context, Entity, FocusHandle, InteractiveElement,
+    IntoElement, KeyBinding, ParentElement, Render, SharedString, StatefulInteractiveElement,
+    StyleRefinement, Styled, Subscription, Task, TitlebarOptions, Window,
+    WindowBackgroundAppearance, WindowBounds, WindowDecorations, WindowOptions, actions, div,
+    prelude::FluentBuilder, px, size,
 };
 
 use super::{Settings, SettingsStore};
@@ -77,6 +78,8 @@ fn open_window(cx: &mut App) {
         }),
         // Ely's column draws the controls; only Linux reads this.
         window_decorations: Some(WindowDecorations::Client),
+        // The settings window stays opaque, as upstream decided: a blurred one costs the compositor a pass over the desktop behind it, every frame.
+        window_background: WindowBackgroundAppearance::Opaque,
         ..Default::default()
     };
     match cx.open_window(options, |window, cx| {
@@ -108,10 +111,24 @@ pub struct SettingsWindow {
     adding: bool,
     /// Whether the cursor preview shows, as it blinks.
     lit: bool,
+    /// The open page, in a view of its own: a scroll reuses its layout instead of building fifteen theme cards again.
+    page: Option<Entity<PageView>>,
     _typed: Subscription,
     _settings: Subscription,
     _updates: Subscription,
     _blink: Task<()>,
+}
+
+/// The open page, drawn apart from the window's frame so the frame's scroll does not rebuild it.
+pub struct PageView {
+    settings: Entity<SettingsWindow>,
+}
+
+impl Render for PageView {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let settings = self.settings.clone();
+        settings.read(cx).page(&settings, window, cx)
+    }
 }
 
 impl SettingsWindow {
@@ -148,11 +165,24 @@ impl SettingsWindow {
             fallbacks: Vec::new(),
             adding: false,
             lit: true,
+            page: None,
             _typed: typed,
-            _settings: cx.observe_global::<SettingsStore>(|_, cx| cx.notify()),
-            _updates: cx.observe_global::<Updates>(|_, cx| cx.notify()),
+            _settings: cx.observe_global_in::<SettingsStore>(window, |this, window, cx| {
+                this.grow_fallbacks(window, cx);
+                this.paged(cx);
+            }),
+            _updates: cx.observe_global::<Updates>(|this, cx| this.paged(cx)),
             _blink: Self::blink(cx),
         }
+    }
+
+    /// Shows the page again, as a change it draws has landed.
+    fn paged(&self, cx: &mut Context<Self>) {
+        if let Some(page) = &self.page {
+            let page = page.clone();
+            page.update(cx, |_, cx| cx.notify());
+        }
+        cx.notify();
     }
 
     /// Blinks the cursor preview as a terminal blinks its cursor, while it shows.
@@ -163,7 +193,7 @@ impl SettingsWindow {
                 let ticked = this.update(cx, |this, cx| {
                     if this.section == "appearance" && SettingsStore::get(cx).cursor_blink {
                         this.lit = !this.lit;
-                        cx.notify();
+                        this.paged(cx);
                     }
                 });
                 if ticked.is_err() {
@@ -208,7 +238,7 @@ fn sections(open: &SharedString, cx: &Context<SettingsWindow>) -> SelectableList
             log::info!("settings: open {key}");
             this.update(cx, |this, cx| {
                 this.section = key.clone();
-                cx.notify();
+                this.paged(cx);
             });
         }
     };
@@ -330,23 +360,43 @@ fn set(
     saved
 }
 
-impl Render for SettingsWindow {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+impl SettingsWindow {
+    /// The open page, with the failure it shows above it. Drawn by `PageView`, so a scroll of the window reuses it.
+    fn page(&self, this: &Entity<SettingsWindow>, window: &Window, cx: &App) -> AnyElement {
         let page = match self.section.as_ref() {
-            "appearance" => {
-                self.grow_fallbacks(window, cx);
-                self.appearance(window, cx).into_any_element()
-            }
-            "terminal" => self.terminal(cx).into_any_element(),
-            "general" => self.general(cx).into_any_element(),
+            "appearance" => self.appearance(this, window, cx).into_any_element(),
+            "terminal" => self.terminal(this, cx).into_any_element(),
+            "general" => self.general(this, cx).into_any_element(),
             other => unreachable!("settings: no section {other}"),
         };
-        let page = div()
+        div()
             .flex()
             .flex_col()
             .gap_4()
             .children((self.failed.clone()).map(|why| InlineMessage::new(Severity::Danger, why)))
-            .child(page);
+            .child(page)
+            .into_any_element()
+    }
+}
+
+impl Render for SettingsWindow {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // Built on the first frame, as it needs this window's own handle.
+        let page = match &self.page {
+            Some(page) => page.clone(),
+            None => {
+                let settings = cx.entity();
+                let page = cx.new(|_| PageView { settings });
+                self.page = Some(page.clone());
+                page
+            }
+        };
+        let body = div()
+            .id("settings-body")
+            .size_full()
+            .overflow_y_scroll()
+            .p_6()
+            .child(page.cached(StyleRefinement::default().size_full()));
         let (key, _) = SECTIONS
             .iter()
             .find(|(key, ..)| *key == self.section.as_ref())
@@ -358,12 +408,6 @@ impl Render for SettingsWindow {
             .overflow_y_scroll()
             .p_2()
             .child(sections(&self.section, cx));
-        let body = div()
-            .id("settings-body")
-            .size_full()
-            .overflow_y_scroll()
-            .p_6()
-            .child(page);
         // The categories and the page scroll apart.
         let shell = ColumnShell::new("settings")
             .column(

@@ -2,7 +2,6 @@
 
 use ely_gpui_component::{
     forms::RadioCard,
-    layout::SimpleGrid,
     theme::{ActiveTheme, TextSize},
 };
 use gpui::{App, Div, Entity, SharedString, Styled, Window, div, prelude::*, rems};
@@ -63,10 +62,8 @@ pub(super) fn grid(
                 })
         }));
     let rem = window.rem_size();
-    let (min, gap) = (
-        theme.label_width().to_pixels(rem),
-        rems(0.75).to_pixels(rem),
-    );
+    let gap = rems(0.75).to_pixels(rem);
+    // A fixed number of columns, not a measured one: a grid that measures its own width to pick its columns never settles, and the window redraws itself forever.
     div()
         .flex()
         .flex_col()
@@ -75,7 +72,8 @@ pub(super) fn grid(
         .border_b_1()
         .border_color(theme.colors.border)
         .children(title.map(|title| div().text_size(theme.text_size(TextSize::Sm)).child(title)))
-        .child(
-            SimpleGrid::new(SharedString::from(format!("{field}-grid")), min, gap).children(cards),
-        )
+        .child(div().grid().grid_cols(COLUMNS).gap(gap).children(cards))
 }
+
+/// The theme cards' columns; the window is 900 wide, so three fit.
+const COLUMNS: u16 = 3;
