@@ -370,7 +370,7 @@ pub(crate) fn folder(body: &[u8]) -> Option<PathBuf> {
         log::debug!("pty: OSC 7 from host {host}, not this one");
         return None;
     }
-    let path = match decode(&rest[slash..]) {
+    let path = match crate::location::percent_decode(&rest[slash..]) {
         Some(path) => path,
         None => {
             log::warn!("pty: OSC 7 path is not UTF-8 after decoding");
@@ -384,28 +384,6 @@ pub(crate) fn folder(body: &[u8]) -> Option<PathBuf> {
     } else {
         &path[..]
     }))
-}
-
-fn decode(bytes: &[u8]) -> Option<String> {
-    let mut out = Vec::with_capacity(bytes.len());
-    let mut at = 0;
-    while at < bytes.len() {
-        let hex = bytes
-            .get(at + 1..at + 3)
-            .and_then(|two| std::str::from_utf8(two).ok())
-            .and_then(|two| u8::from_str_radix(two, 16).ok());
-        match (bytes[at], hex) {
-            (b'%', Some(value)) => {
-                out.push(value);
-                at += 3;
-            }
-            (byte, _) => {
-                out.push(byte);
-                at += 1;
-            }
-        }
-    }
-    String::from_utf8(out).ok()
 }
 
 mod modes;
