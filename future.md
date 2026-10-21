@@ -80,6 +80,22 @@
 2. `FEATURES.md` 说「没有标签、没有分屏」——已经有，只是标签在左栏树里。是否加顶部标签条见 `TAB-02`。
 3. `PLAN.md` 设想「顶部标签条」，当前实现是树形标签。两者不必都做，见 `TAB-01` / `TAB-02` 的取舍。
 
+### 1.4 本轮已做（2026-10-22）
+
+> 以下按 `future.md` 的编号记录这一轮落地的部分；没列的保持原状态。
+
+- **SHELL-01 / 04 / 05**：启动时扫描已知安装路径、`PATH`、Git for Windows 注册表项与 `wsl.exe -l -v`；Git Bash 与 System32 的 WSL 启动器分开识别；WSL 发行版按本地化表头安全的列解析。见 `src/term/shell/scan.rs`。
+- **SHELL-03 / 07**：设置未指定 shell 时选评分最高的本地 shell；WSL 用 `-d`、`--cd` 启动，PowerShell 5.1/7 共用 `-NoLogo -NoExit -ExecutionPolicy Bypass -Command`。见 `src/term/shell.rs`。
+- **SHELL-12**：起始目录支持 `Home` / `当前会话` / `固定目录` / `上次目录`，目录不存在时回退到 home；设置窗口可选择并填写固定目录。见 `src/settings/mod.rs`。
+- **PATH-01 / 03 / 04 / 05**：新增 `Location` 模型与 Windows ↔ WSL ↔ Git Bash 路径映射；起始目录校验与回退也走它。见 `src/location.rs`。
+- **PATH-02**：除 OSC 7 外，读取 ConEmu `OSC 9;9` 与 iTerm2 `OSC 1337;CurrentDir`。
+- **PATH-07**：拖放路径按目标 shell 转换：WSL 得 `/mnt/c/...`，Git Bash 得 `/c/...`，再按 shell 语法引用。
+- **FIND-03**：单行选区会预填到搜索框。
+- **TAB-16 / 25**：`Ctrl/Cmd+Shift+Enter` 放大当前窗格，`Ctrl/Cmd+Shift+Z` 隐藏两栏进入 zen。
+- **BLOCK-01 / 07**：OSC 133 标记组成命令块，记录时长与退出码；会话行显示最近一条命令的耗时与失败码。见 `src/term/blocks.rs`。
+- **STAT-10**：超过 10 秒的命令结束时，在会话不可见时发系统通知。
+- **CONN-01 / 02 / 03**：读取 `~/.ssh/config`（含 `Include`，跳过通配 Host），`ssh -G` 解析生效值并按配置 mtime 失效缓存；左栏列出主机，点一行开新标签执行 `ssh <host>`。
+
 ---
 
 ## 2. 功能库
