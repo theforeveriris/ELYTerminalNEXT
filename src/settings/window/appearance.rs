@@ -55,10 +55,18 @@ impl SettingsWindow {
                 let this = this.clone();
                 move |_, _, cx| super::theme_import::import_theme(&this, cx)
             });
+        let export = Button::new("export-theme", "Export…")
+            .size(ControlSize::Sm)
+            .on_click({
+                let this = this.clone();
+                move |_, window, cx| {
+                    super::theme_import::export_theme(&this, window.appearance(), cx)
+                }
+            });
         themes = themes.row(
-            SettingsRow::new("Theme file")
+            SettingsRow::new("Theme files")
                 .description("iTerm2 .itermcolors, Windows Terminal JSON, or Ghostty")
-                .control(import),
+                .control(div().flex().gap_1().child(import).child(export)),
         );
         if separate {
             themes = themes.row(super::themegrid::grid(
