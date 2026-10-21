@@ -7,7 +7,10 @@ use std::{
 use anyhow::Context as _;
 use gpui::{App, Global};
 
-use super::{drop::Quote, pty::Launch};
+use super::{
+    drop::{Quote, Target},
+    pty::Launch,
+};
 
 pub mod scan;
 
@@ -150,6 +153,20 @@ fn start(
             scan::Family::PowerShell => Quote::PowerShell,
             scan::Family::Cmd => Quote::Cmd,
             _ => Quote::Posix,
+        },
+        target: match family {
+            scan::Family::Wsl => Target::Wsl {
+                distro: args
+                    .iter()
+                    .position(|arg| arg == "-d")
+                    .and_then(|at| args.get(at + 1))
+                    .cloned()
+                    .unwrap_or_else(|| "default".into()),
+            },
+            scan::Family::Bash | scan::Family::Msys | scan::Family::Cygwin if cfg!(windows) => {
+                Target::GitBash
+            }
+            _ => Target::Local,
         },
     };
     let script = |name: &str| {

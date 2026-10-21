@@ -1,6 +1,6 @@
 //! Files dropped on the terminal type their paths, as macOS Terminal does.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::Context as _;
 use gpui::{Context, ExternalPaths};
@@ -12,6 +12,40 @@ const SPECIAL: &str = "\\ ()[]{}<>\"'`!#$&;|*?^~";
 
 /// PowerShell's single quotes, each one doubled inside a quoted string.
 const SINGLE: [char; 5] = ['\'', '\u{2018}', '\u{2019}', '\u{201a}', '\u{201b}'];
+
+/// Where a session's shell reads its paths, which decides how a dropped path is written.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Target {
+    /// A shell on this machine.
+    Local,
+    /// Git Bash, which reads `C:\x` as `/c/x`.
+    GitBash,
+    /// A WSL distribution, which reads `C:\x` as `/mnt/c/x`.
+    Wsl { distro: String },
+}
+
+impl Target {
+    /// `path` as this target's shell reads it; a path with no such form stays as it is.
+    pub fn convert(&self, path: &Path) -> PathBuf {
+        let Some(text) = path.to_str() else {
+            return path.to_path_buf();
+        };
+        let mapped = match self {
+            Self::Local => None,
+            Self::GitBash => crate::location::windows_to_posix(text),
+            Self::Wsl { .. } => crate::location::windows_to_wsl(text),
+        };
+        mapped
+            .map(PathBuf::from)
+            .unwrap_or_else(|| path.to_path_buf())
+    }
+}
+
+/// The text dropping `paths` on a shell at `target` types, each followed by a space.
+pub fn typed_for(paths: &[PathBuf], target: &Target, quote: Quote) -> anyhow::Result<String> {
+    let mapped: Vec<PathBuf> = paths.iter().map(|path| target.convert(path)).collect();
+    typed(&mapped, quote)
+}
 
 /// How a session's shell reads a path typed into it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -73,12 +107,13 @@ impl TerminalView {
     /// Types the dropped paths at the cursor as a paste; a path it cannot type stops the drop.
     pub(super) fn drop_paths(&mut self, dropped: &ExternalPaths, cx: &mut Context<Self>) {
         let (paths, quote) = (dropped.paths(), self.pty.quote);
-        match typed(paths, quote) {
+        match typed_for(paths, &self.pty.target, quote) {
             Ok(text) => {
                 log::info!(
-                    "terminal {}: {} paths dropped, quoted for {quote:?}",
+                    "terminal {}: {} paths dropped, quoted for {quote:?} at {:?}",
                     self.pty.pid,
-                    paths.len()
+                    paths.len(),
+                    self.pty.target
                 );
                 self.paste_text(&text, cx);
             }

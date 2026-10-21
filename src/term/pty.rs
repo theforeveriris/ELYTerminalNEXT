@@ -11,7 +11,14 @@ use alacritty_terminal::{
 };
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender, unbounded};
 
-use super::{drop::Quote, marks::Mark, mouse::MouseMode, notify::Ask, status::Status, tap::Tapped};
+use super::{
+    drop::{Quote, Target},
+    marks::Mark,
+    mouse::MouseMode,
+    notify::Ask,
+    status::Status,
+    tap::Tapped,
+};
 use crate::settings::{CursorStyle, Settings};
 
 /// What a session hears from its pty.
@@ -63,6 +70,8 @@ pub struct Launch {
     pub reports: bool,
     /// How its shell reads a path dropped on it.
     pub quote: Quote,
+    /// Where its shell reads paths: this machine, Git Bash or a WSL distribution.
+    pub target: Target,
 }
 
 /// A running program on a pseudo-terminal and the grid it draws into.
@@ -70,6 +79,7 @@ pub struct Pty {
     pub term: Arc<FairMutex<Term<Listener>>>,
     pub pid: u32,
     pub quote: Quote,
+    pub target: Target,
     notifier: Notifier,
     #[cfg(unix)]
     master: std::fs::File,
@@ -156,6 +166,7 @@ pub fn spawn(
             term,
             pid,
             quote: launch.quote,
+            target: launch.target.clone(),
             notifier,
             #[cfg(unix)]
             master,

@@ -59,6 +59,56 @@ fn a_cmd_path_is_double_quoted_its_trailing_backslashes_doubled_and_one_cmd_expa
 }
 
 #[test]
+fn a_dropped_path_is_written_the_way_the_target_reads_it() {
+    let path = PathBuf::from(r"C:\Users\me\my file.txt");
+    assert_eq!(
+        typed_for(
+            std::slice::from_ref(&path),
+            &Target::Wsl {
+                distro: "archlinux".into()
+            },
+            Quote::Posix
+        )
+        .unwrap(),
+        "/mnt/c/Users/me/my\\ file.txt "
+    );
+    assert_eq!(
+        typed_for(std::slice::from_ref(&path), &Target::GitBash, Quote::Posix).unwrap(),
+        "/c/Users/me/my\\ file.txt "
+    );
+    assert_eq!(
+        typed_for(
+            std::slice::from_ref(&path),
+            &Target::Local,
+            Quote::PowerShell
+        )
+        .unwrap(),
+        "'C:\\Users\\me\\my file.txt' "
+    );
+}
+
+#[test]
+fn a_wsl_share_drops_as_its_own_folder() {
+    let path = PathBuf::from(r"\\wsl.localhost\Ubuntu-22.04\home\me\src");
+    let target = Target::Wsl {
+        distro: "Ubuntu-22.04".into(),
+    };
+    assert_eq!(
+        target.convert(&path),
+        PathBuf::from("/home/me/src"),
+        "the distribution's own path"
+    );
+}
+
+#[test]
+fn a_path_no_target_names_stays_as_it_is() {
+    let share = PathBuf::from(r"\\server\share\file");
+    assert_eq!(Target::Wsl { distro: "x".into() }.convert(&share), share);
+    assert_eq!(Target::GitBash.convert(&share), share);
+    assert_eq!(Target::Local.convert(&share), share);
+}
+
+#[test]
 fn a_path_with_a_control_character_types_nothing() {
     for quote in [Quote::Posix, Quote::PowerShell, Quote::Cmd] {
         let paths = [PathBuf::from("/ok"), PathBuf::from("/tmp/a\nls")];

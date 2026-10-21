@@ -68,7 +68,7 @@ impl Location {
         {
             return None;
         }
-        let path = percent_decode(rest[slash..].as_bytes())?;
+        let path = percent_decode(&rest.as_bytes()[slash..])?;
         let drive = path
             .as_bytes()
             .get(1..3)
