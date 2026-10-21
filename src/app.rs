@@ -12,6 +12,7 @@ use crate::term::mac;
 use crate::{
     blur, menus,
     settings::{self, SettingsStore},
+    ssh,
     term::{ICONS, Launch, MONO, config, input, shell::ShellIntegration, spawn},
     themes, updates,
     workspace::{self, TITLE, Workspace},
@@ -47,6 +48,13 @@ pub fn start(cx: &mut App) -> anyhow::Result<()> {
     SettingsStore::init(cx)?;
     updates::start(cx);
     ShellIntegration::init(cx)?;
+    let hosts = ssh::default_config().map_or_else(ssh::Hosts::default, |path| ssh::read(&path));
+    log::info!(
+        "ssh: {} hosts from {} files",
+        hosts.hosts.len(),
+        hosts.files.len()
+    );
+    cx.set_global(hosts);
     input::bind_keys(cx);
     workspace::bind_keys(cx);
     settings::window::bind_keys(cx);

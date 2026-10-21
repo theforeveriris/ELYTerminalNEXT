@@ -7,6 +7,7 @@ pub mod menus;
 pub mod pet;
 pub mod sessions;
 pub mod settings;
+pub mod ssh;
 pub mod term;
 #[cfg(all(test, unix))]
 mod testlog;
