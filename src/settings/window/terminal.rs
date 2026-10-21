@@ -60,6 +60,8 @@ impl SettingsWindow {
         let start = match settings.start_in {
             StartIn::Home => "home",
             StartIn::Session => "session",
+            StartIn::Fixed => "fixed",
+            StartIn::Last => "last",
         };
         let start = SegmentedControl::new("settings-start-in", start)
             .segment(
@@ -72,11 +74,27 @@ impl SettingsWindow {
                 language::message(cx, "settings.terminal.start.session"),
                 None,
             )
+            .segment(
+                "fixed",
+                language::message(cx, "settings.terminal.start.fixed"),
+                None,
+            )
+            .segment(
+                "last",
+                language::message(cx, "settings.terminal.start.last"),
+                None,
+            )
             .size(ControlSize::Sm)
             .on_change({
                 let this = this.clone();
                 move |value, _, cx| start_in(&this, value, cx)
             });
+        let fixed = div()
+            .w(cx.theme().prose_width())
+            .flex()
+            .flex_col()
+            .gap_1()
+            .child(PathInput::new("settings-start-folder", &self.start_folder));
         let lines = NumberInput::new(("scrollback", self.drafts), f64::from(settings.scrollback))
             .range(f64::from(*SCROLLBACK.start()), f64::from(*SCROLLBACK.end()))
             .step(1000.)
@@ -97,6 +115,11 @@ impl SettingsWindow {
                     .control(shell),
             )
             .row(SettingsRow::new(language::message(cx, "settings.terminal.start")).control(start))
+            .row(
+                SettingsRow::new(language::message(cx, "settings.terminal.start.folder"))
+                    .description(language::message(cx, "settings.terminal.start.folder.hint"))
+                    .control(fixed),
+            )
             .row(
                 SettingsRow::new(language::message(cx, "settings.terminal.scrollback"))
                     .control(lines),
@@ -217,6 +240,8 @@ fn start_in(this: &Entity<SettingsWindow>, value: &SharedString, cx: &mut App) {
     let start = match value.as_ref() {
         "home" => StartIn::Home,
         "session" => StartIn::Session,
+        "fixed" => StartIn::Fixed,
+        "last" => StartIn::Last,
         other => unreachable!("settings: no start {other}"),
     };
     set(

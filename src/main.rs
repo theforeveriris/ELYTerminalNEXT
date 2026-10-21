@@ -23,11 +23,9 @@ fn application() -> gpui::Application {
 fn run(cx: &mut App) -> anyhow::Result<()> {
     app::start(cx)?;
     let home = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("app: no home folder"))?;
-    let launch = launch(
-        &SettingsStore::get(cx).shell,
-        home,
-        &cx.global::<ShellIntegration>().0,
-    )?;
+    let settings = SettingsStore::get(cx);
+    let folder = settings.start_folder(&home, None);
+    let launch = launch(&settings.shell, folder, &cx.global::<ShellIntegration>().0)?;
     app::open(launch, cx)?;
     cx.activate(true);
     Ok(())

@@ -449,7 +449,7 @@ pub fn distros_from(text: &str) -> Vec<Distro> {
 /// `bytes` as text: WSL answers in UTF-16LE, other programs in the platform's own.
 pub fn utf16le(bytes: &[u8]) -> String {
     let zeros = bytes.chunks_exact(2).filter(|pair| pair[1] == 0).count();
-    let utf16 = bytes.len() > 1 && bytes.len() % 2 == 0 && zeros * 4 >= bytes.len();
+    let utf16 = bytes.len() > 1 && bytes.len().is_multiple_of(2) && zeros * 4 >= bytes.len();
     if !utf16 {
         return String::from_utf8_lossy(bytes).into_owned();
     }

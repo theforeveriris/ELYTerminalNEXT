@@ -10,7 +10,7 @@ use crate::{
     files::Files,
     git::panel::{Acted, GitPanel},
     sessions::{Session, orb},
-    settings::{Settings, SettingsStore, StartIn},
+    settings::{Settings, SettingsStore},
     term::{
         Events, Launch, Pty, TerminalView, config,
         shell::{ShellIntegration, launch},
@@ -281,15 +281,27 @@ impl Workspace {
             log::error!("app: no home folder, so no new session");
             return None;
         };
-        let settings = SettingsStore::get(cx);
-        let folder = match settings.start_in {
-            StartIn::Home => home,
-            StartIn::Session => self
-                .session(self.active)
-                .map_or(home, |session| session.folder.clone()),
-        };
-        let started = launch(&settings.shell, folder, &cx.global::<ShellIntegration>().0)
-            .and_then(|launch| Ok((spawn(&launch, (80, 24), (8, 16), config(settings))?, launch)));
+        let settings = SettingsStore::get(cx).clone();
+        let session = self
+            .session(self.active)
+            .map(|session| session.folder.as_path());
+        let folder = settings.start_folder(&home, session);
+        if settings.last_folder.as_deref() != Some(folder.to_string_lossy().as_ref()) {
+            let last = folder.display().to_string();
+            if let Err(error) =
+                SettingsStore::update(cx, |settings| settings.last_folder = Some(last.clone()))
+            {
+                log::debug!("app: the last folder stays: {error:#}");
+            }
+        }
+        let started = launch(&settings.shell, folder, &cx.global::<ShellIntegration>().0).and_then(
+            |launch| {
+                Ok((
+                    spawn(&launch, (80, 24), (8, 16), config(&settings))?,
+                    launch,
+                ))
+            },
+        );
         match started {
             Ok(((pty, events), launch)) => Some(self.add(pty, events, launch, window, cx)),
             Err(error) => {

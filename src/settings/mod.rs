@@ -2,7 +2,12 @@ pub mod language;
 mod store;
 pub mod window;
 
-use std::{env, ffi::OsStr, ops::RangeInclusive, path::Path};
+use std::{
+    env,
+    ffi::OsStr,
+    ops::RangeInclusive,
+    path::{Path, PathBuf},
+};
 
 use anyhow::Context as _;
 use serde::{Deserialize, Serialize};
@@ -19,6 +24,10 @@ pub enum StartIn {
     #[default]
     Home,
     Session,
+    /// The folder `start_in_folder` names.
+    Fixed,
+    /// The folder the last new session started in.
+    Last,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -58,6 +67,10 @@ pub struct Settings {
     /// A program path; empty runs the login shell.
     pub shell: String,
     pub start_in: StartIn,
+    /// The folder a session starts in when `start_in` is `Fixed`.
+    pub start_in_folder: String,
+    /// The folder the last new session started in, for `start_in`'s `Last`.
+    pub last_folder: Option<String>,
     pub theme: String,
     /// The theme while the system is dark; none keeps `theme`.
     pub dark_theme: Option<String>,
@@ -102,6 +115,8 @@ impl Default for Settings {
         Self {
             shell: String::new(),
             start_in: StartIn::Home,
+            start_in_folder: String::new(),
+            last_folder: None,
             theme: themes::default_id().into(),
             dark_theme: None,
             font_family: "JetBrains Mono".into(),
@@ -144,6 +159,32 @@ pub const WINDOW: RangeInclusive<f32> = 100.0..=16384.0;
 pub const ELY_LEFT: RangeInclusive<f32> = 0.0..=16384.0;
 
 impl Settings {
+    /// Where a new session starts: its strategy's folder when it exists, else the home folder.
+    pub fn start_folder(&self, home: &Path, session: Option<&Path>) -> PathBuf {
+        let named = match self.start_in {
+            StartIn::Home => home.to_path_buf(),
+            StartIn::Session => session.unwrap_or(home).to_path_buf(),
+            StartIn::Fixed => PathBuf::from(&self.start_in_folder),
+            StartIn::Last => self
+                .last_folder
+                .as_ref()
+                .map(PathBuf::from)
+                .unwrap_or_default(),
+        };
+        if named.is_dir() {
+            named
+        } else {
+            if !named.as_os_str().is_empty() {
+                log::warn!(
+                    "settings: {} is no folder; the session starts in {}",
+                    named.display(),
+                    home.display()
+                );
+            }
+            home.to_path_buf()
+        }
+    }
+
     /// Every value inside its range, every theme built in; the error names the field.
     pub fn validate(&self) -> anyhow::Result<()> {
         within("font_size", self.font_size, &FONT_SIZE)?;
@@ -244,6 +285,59 @@ fn within<T: PartialOrd + std::fmt::Display>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_new_session_starts_where_the_strategy_says_or_at_home() {
+        use std::fs;
+        let root = env::temp_dir().join(format!("elyterminal-start-{}", std::process::id()));
+        let (home, session, fixed) = (root.join("home"), root.join("session"), root.join("fixed"));
+        for folder in [&home, &session, &fixed] {
+            fs::create_dir_all(folder).expect("a test folder");
+        }
+        let settings = |start_in, start_in_folder: &str, last_folder: Option<&Path>| Settings {
+            start_in,
+            start_in_folder: start_in_folder.into(),
+            last_folder: last_folder.map(|folder| folder.display().to_string()),
+            ..Settings::default()
+        };
+        assert_eq!(
+            settings(StartIn::Home, "", None).start_folder(&home, Some(&session)),
+            home
+        );
+        assert_eq!(
+            settings(StartIn::Session, "", None).start_folder(&home, Some(&session)),
+            session
+        );
+        assert_eq!(
+            settings(StartIn::Session, "", None).start_folder(&home, None),
+            home,
+            "no session to follow"
+        );
+        assert_eq!(
+            settings(StartIn::Fixed, fixed.to_str().expect("a path"), None)
+                .start_folder(&home, None),
+            fixed
+        );
+        assert_eq!(
+            settings(StartIn::Fixed, "", None).start_folder(&home, None),
+            home,
+            "an empty fixed folder falls back"
+        );
+        assert_eq!(
+            settings(StartIn::Fixed, "/no/such/folder", None).start_folder(&home, None),
+            home,
+            "a folder that is gone falls back"
+        );
+        assert_eq!(
+            settings(StartIn::Last, "", Some(&session)).start_folder(&home, None),
+            session
+        );
+        assert_eq!(
+            settings(StartIn::Last, "", None).start_folder(&home, None),
+            home
+        );
+        fs::remove_dir_all(&root).expect("cleanup");
+    }
 
     #[test]
     fn defaults_are_valid() {

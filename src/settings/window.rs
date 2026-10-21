@@ -96,6 +96,8 @@ pub struct SettingsWindow {
     focus: FocusHandle,
     section: SharedString,
     shell: Entity<TextInput>,
+    /// The start folder a fixed start reads.
+    start_folder: Entity<TextInput>,
     /// The shortcut list's search.
     search: Entity<TextInput>,
     /// Why the typed shell is not saved.
@@ -114,6 +116,7 @@ pub struct SettingsWindow {
     /// The open page, in a view of its own: a scroll reuses its layout instead of building fifteen theme cards again.
     page: Option<Entity<PageView>>,
     _typed: Subscription,
+    _start: Subscription,
     _settings: Subscription,
     _updates: Subscription,
     _blink: Task<()>,
@@ -139,10 +142,27 @@ impl SettingsWindow {
             input.set_text(SettingsStore::get(cx).shell.clone(), cx);
             input
         });
+        let start_folder = cx.new(|cx| {
+            let mut input = TextInput::new(window, cx)
+                .placeholder(language::message(cx, "settings.terminal.start.folder"));
+            input.set_text(SettingsStore::get(cx).start_in_folder.clone(), cx);
+            input
+        });
         let font = cx.new(|cx| TextInput::new(window, cx));
         let search = cx.new(|cx| {
             TextInput::new(window, cx)
                 .placeholder(language::message(cx, "settings.terminal.search"))
+        });
+        let start_typed = cx.subscribe(&start_folder, |this, input, event: &InputEvent, cx| {
+            if let InputEvent::Changed = event {
+                let folder = input.read(cx).text().to_string();
+                let saved =
+                    SettingsStore::update(cx, |settings| settings.start_in_folder = folder.clone());
+                if let Err(error) = saved {
+                    log::debug!("settings: the start folder stays: {error:#}");
+                }
+                this.paged(cx);
+            }
         });
         let typed = cx.subscribe(&shell, |this, input, event: &InputEvent, cx| {
             if let InputEvent::Changed = event {
@@ -157,6 +177,7 @@ impl SettingsWindow {
             focus,
             section: SECTIONS[0].0.into(),
             shell,
+            start_folder,
             search,
             refused: None,
             failed: None,
@@ -167,6 +188,7 @@ impl SettingsWindow {
             lit: true,
             page: None,
             _typed: typed,
+            _start: start_typed,
             _settings: cx.observe_global_in::<SettingsStore>(window, |this, window, cx| {
                 this.grow_fallbacks(window, cx);
                 this.paged(cx);
