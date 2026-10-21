@@ -21,6 +21,7 @@ use crate::{
 
 mod events;
 mod layout;
+mod mru;
 mod rename;
 mod restore;
 mod tabs;
@@ -40,6 +41,8 @@ actions!(
         NextSession,
         PreviousSession,
         LastSession,
+        NextUsed,
+        PreviousUsed,
         NewTab,
         CloseTab,
         NextTab,
@@ -122,8 +125,10 @@ pub fn bind_keys(cx: &mut App) {
     cx.bind_keys([
         KeyBinding::new(new, NewSession, context),
         KeyBinding::new(close, CloseSession, context),
-        KeyBinding::new("ctrl-tab", NextTab, context),
-        KeyBinding::new("ctrl-shift-tab", PreviousTab, context),
+        KeyBinding::new("ctrl-tab", NextUsed, context),
+        KeyBinding::new("ctrl-shift-tab", PreviousUsed, context),
+        KeyBinding::new("ctrl-pagedown", NextTab, context),
+        KeyBinding::new("ctrl-pageup", PreviousTab, context),
         KeyBinding::new(&format!("{digit}-9"), LastTab, context),
         // The sessions step within the shown tab.
         KeyBinding::new("ctrl-shift-right", NextSession, context),
@@ -176,6 +181,8 @@ pub struct Workspace {
     zen: bool,
     /// Writes the tabs a moment after the last change that could alter them.
     saving: Option<Task<()>>,
+    /// The sessions in the order they were last shown.
+    mru: mru::Mru,
     _settings: Subscription,
     _acted: Subscription,
 }
@@ -217,6 +224,7 @@ impl Workspace {
             zoom: None,
             zen: false,
             saving: None,
+            mru: mru::Mru::default(),
             _settings: cx.observe_global_in::<SettingsStore>(window, |this, window, cx| {
                 this.background.follow(window, SettingsStore::get(cx));
                 cx.notify();
@@ -376,6 +384,7 @@ impl Workspace {
         self.files.update(cx, |files, cx| files.show(&folder, cx));
         self.git.update(cx, |git, cx| git.show(&folder, cx));
         self.active = id;
+        self.mru.touch(id);
         if self.zoom.is_some() {
             self.zoom = Some(id);
         }
@@ -394,6 +403,7 @@ impl Workspace {
             .session(id)
             .map(|session| session.terminal.read(cx).pid());
         log::info!("app: session {id} closes");
+        self.mru.forget(id);
         if self.zoom == Some(id) {
             self.zoom = None;
         }

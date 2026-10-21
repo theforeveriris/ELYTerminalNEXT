@@ -18,8 +18,8 @@ use crate::{
     },
     updates::{self, Updates, VERSION},
     workspace::{
-        self, CloseSession, LastSession, NewSession, NextSession, PreviousSession, SelectSession,
-        TogglePanel, ToggleSessions,
+        self, CloseSession, LastSession, NewSession, NextSession, NextUsed, PreviousSession,
+        PreviousUsed, SelectSession, TogglePanel, ToggleSessions,
     },
 };
 
@@ -304,6 +304,8 @@ thread_local! {
         listed.extend(places.map(|(ix, name)| ("Sessions", *name, SelectSession(ix).boxed_clone())));
         listed.extend([
             ("Sessions", "Last session", LastSession.boxed_clone()),
+            ("Tabs", "Next used tab", NextUsed.boxed_clone()),
+            ("Tabs", "Previous used tab", PreviousUsed.boxed_clone()),
             ("Edit", "Copy", Copy.boxed_clone()),
             ("Edit", "Paste", Paste.boxed_clone()),
             ("Edit", "Select all", SelectAll.boxed_clone()),

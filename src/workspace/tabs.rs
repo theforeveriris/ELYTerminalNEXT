@@ -278,4 +278,11 @@ impl Workspace {
         let id = next[at];
         self.select(id, window, cx);
     }
+
+    /// Shows the newest session not shown, or the oldest, as Ctrl-Tab walks them.
+    pub(super) fn step_used(&mut self, forward: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(id) = self.mru.next(self.active, forward) {
+            self.select(id, window, cx);
+        }
+    }
 }

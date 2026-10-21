@@ -17,8 +17,9 @@ use gpui::{
 
 use super::{
     CONTEXT, ClosePane, CloseSession, CloseTab, FocusPane, LastSession, LastTab, NewSession,
-    NewTab, NextSession, NextTab, PreviousSession, PreviousTab, SelectSession, SelectTab, Side,
-    SplitDown, SplitRight, TogglePanel, ToggleSessions, Workspace, Zen, ZoomPane,
+    NewTab, NextSession, NextTab, NextUsed, PreviousSession, PreviousTab, PreviousUsed,
+    SelectSession, SelectTab, Side, SplitDown, SplitRight, TogglePanel, ToggleSessions, Workspace,
+    Zen, ZoomPane,
 };
 use crate::menus;
 use crate::sessions::{self, Session};
@@ -370,6 +371,12 @@ impl Render for Workspace {
             .on_action(cx.listener(|this, _: &NextTab, window, cx| this.step_tab(true, window, cx)))
             .on_action(
                 cx.listener(|this, _: &PreviousTab, window, cx| this.step_tab(false, window, cx)),
+            )
+            .on_action(
+                cx.listener(|this, _: &NextUsed, window, cx| this.step_used(true, window, cx)),
+            )
+            .on_action(
+                cx.listener(|this, _: &PreviousUsed, window, cx| this.step_used(false, window, cx)),
             )
             .on_action(cx.listener(|this, _: &LastTab, window, cx| {
                 let last = this.tabs.len().saturating_sub(1);
