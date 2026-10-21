@@ -20,7 +20,10 @@ use super::{Settings, SettingsStore};
 use crate::{app::APP_ID, menus, term::BLINK, updates::Updates};
 
 mod appearance;
+mod custom;
+mod general;
 mod terminal;
+mod themegrid;
 
 actions!(elyterminal, [OpenSettings, CloseSettings]);
 
@@ -28,9 +31,10 @@ actions!(elyterminal, [OpenSettings, CloseSettings]);
 const CONTEXT: &str = "Settings";
 
 /// Each category's key, name and icon.
-const SECTIONS: [(&str, &str, IconName); 2] = [
+const SECTIONS: [(&str, &str, IconName); 3] = [
     ("appearance", "Appearance", IconName::Palette),
     ("terminal", "Terminal", IconName::Terminal),
+    ("general", "General", IconName::Settings),
 ];
 
 /// Cmd-, opens the settings, Cmd-W closes them; off macOS Ctrl-, and Ctrl-Shift-W, as Ghostty's.
@@ -296,6 +300,7 @@ impl Render for SettingsWindow {
                 self.appearance(window, cx).into_any_element()
             }
             "terminal" => self.terminal(cx).into_any_element(),
+            "general" => self.general(cx).into_any_element(),
             other => unreachable!("settings: no section {other}"),
         };
         let page = div()

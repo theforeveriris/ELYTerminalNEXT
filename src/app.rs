@@ -91,16 +91,20 @@ pub fn start(cx: &mut App) -> anyhow::Result<()> {
     #[cfg(target_os = "linux")]
     themes::omarchy::start(cx)?;
     themes::apply(cx);
+    // The interface speaks the language the settings name.
+    settings::language::apply(SettingsStore::get(cx).language, cx);
     let chosen = |settings: &settings::Settings| {
         let theme = (settings.theme.clone(), settings.dark_theme.clone());
-        (theme, settings.background_opacity)
+        (theme, settings.background_opacity, settings.language)
     };
     let mut worn = chosen(SettingsStore::get(cx));
     cx.observe_global::<SettingsStore>(move |cx| {
         let now = chosen(SettingsStore::get(cx));
         if now != worn {
+            let language = now.2;
             worn = now;
             themes::apply(cx);
+            settings::language::apply(language, cx);
         }
     })
     .detach();

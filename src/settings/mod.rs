@@ -1,3 +1,4 @@
+pub mod language;
 mod store;
 pub mod window;
 
@@ -8,6 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::themes;
 
+pub use language::Language;
 pub use store::{SettingsStore, load, save};
 
 /// Where a new session starts.
@@ -89,6 +91,10 @@ pub struct Settings {
     /// The main window's size, unmaximized, in pixels.
     pub window_width: f32,
     pub window_height: f32,
+    /// The language of the interface; the system's by default.
+    pub language: Language,
+    /// The colors of the theme of the user's own.
+    pub custom_colors: themes::Colors,
 }
 
 impl Default for Settings {
@@ -122,6 +128,8 @@ impl Default for Settings {
             panel_width: 240.0,
             window_width: 1200.0,
             window_height: 760.0,
+            language: Language::default(),
+            custom_colors: themes::Colors::default(),
         }
     }
 }
