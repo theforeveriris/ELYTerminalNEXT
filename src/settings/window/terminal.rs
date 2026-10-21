@@ -12,7 +12,10 @@ use super::{OpenSettings, SettingsWindow, choice, set, switch};
 use crate::{
     menus::{Bigger, Minimize, Quit, ResetSize, Smaller},
     settings::{OptionAsAlt, SCROLLBACK, SettingsStore, StartIn, language},
-    term::input::{self, Find, NextPrompt, PreviousPrompt},
+    term::{
+        input::{self, Find, NextPrompt, PreviousPrompt},
+        shell::Shells,
+    },
     updates::{self, Updates, VERSION},
     workspace::{
         self, CloseSession, LastSession, NewSession, NextSession, PreviousSession, SelectSession,
@@ -36,6 +39,17 @@ impl SettingsWindow {
     /// Shell, start in, scrollback, Option as Alt on macOS, copy on select, Ely and updates, then the shortcuts.
     pub(super) fn terminal(&self, this: &Entity<Self>, cx: &App) -> Div {
         let settings = SettingsStore::get(cx);
+        let names: Vec<String> = cx
+            .global::<Shells>()
+            .0
+            .iter()
+            .map(|shell| shell.name.clone())
+            .collect();
+        let found = if names.is_empty() {
+            "No local shell found; the login shell starts".to_string()
+        } else {
+            format!("Found: {}", names.join(", "))
+        };
         let shell = div()
             .w(cx.theme().prose_width())
             .flex()
@@ -77,7 +91,11 @@ impl SettingsWindow {
                 }
             });
         let mut section = SettingsSection::new(language::message(cx, "settings.terminal.section"))
-            .row(SettingsRow::new(language::message(cx, "settings.terminal.shell")).control(shell))
+            .row(
+                SettingsRow::new(language::message(cx, "settings.terminal.shell"))
+                    .description(found)
+                    .control(shell),
+            )
             .row(SettingsRow::new(language::message(cx, "settings.terminal.start")).control(start))
             .row(
                 SettingsRow::new(language::message(cx, "settings.terminal.scrollback"))

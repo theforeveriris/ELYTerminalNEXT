@@ -9,6 +9,8 @@ use gpui::{App, Global};
 
 use super::{drop::Quote, pty::Launch};
 
+pub mod scan;
+
 /// Each script, by its path under the integration folder.
 const SCRIPTS: [(&str, &str); 4] = [
     (
@@ -34,6 +36,11 @@ pub struct ShellIntegration(pub PathBuf);
 
 impl Global for ShellIntegration {}
 
+/// The shells the scan found at start, best first.
+pub struct Shells(pub Vec<scan::Found>);
+
+impl Global for Shells {}
+
 impl ShellIntegration {
     /// Writes the scripts into the platform's data folder and keeps its path.
     pub fn init(cx: &mut App) -> anyhow::Result<()> {
@@ -42,6 +49,20 @@ impl ShellIntegration {
             .join("ELYTerminal")
             .join("shell-integration");
         install(&dir)?;
+        let found = scan::scan();
+        for shell in &found {
+            log::info!(
+                "shells: {} ({}), {}",
+                shell.name,
+                shell.command(),
+                match shell.confidence {
+                    scan::Confidence::Certain => "certain",
+                    scan::Confidence::Likely => "likely",
+                    scan::Confidence::Guess => "a guess",
+                }
+            );
+        }
+        cx.set_global(Shells(found));
         cx.set_global(Self(dir));
         Ok(())
     }
