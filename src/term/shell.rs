@@ -67,6 +67,7 @@ impl ShellIntegration {
         }
         cx.set_global(Shells(found));
         cx.set_global(Self(dir));
+        probe_in_background(cx);
         Ok(())
     }
 }
@@ -118,6 +119,23 @@ pub fn repair(dir: &Path) -> anyhow::Result<()> {
 /// Repairs the scripts the app installed at start.
 pub fn repair_installed(cx: &App) -> anyhow::Result<()> {
     repair(&cx.global::<ShellIntegration>().0)
+}
+
+/// Asks the found shells for their versions off the main thread, and keeps what they say.
+pub fn probe_in_background(cx: &mut App) {
+    let shells = cx.global::<Shells>().0.clone();
+    cx.spawn(async move |cx| {
+        let shells = cx
+            .background_executor()
+            .spawn(async move {
+                let mut shells = shells;
+                scan::versions(&mut shells);
+                shells
+            })
+            .await;
+        cx.update(|cx| cx.global_mut::<Shells>().0 = shells);
+    })
+    .detach();
 }
 
 /// How to start `shell`, or the login shell when empty, in `cwd` so it reports its folder.

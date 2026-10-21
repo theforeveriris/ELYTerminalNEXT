@@ -43,7 +43,10 @@ impl SettingsWindow {
             .global::<Shells>()
             .0
             .iter()
-            .map(|shell| shell.name.clone())
+            .map(|shell| match &shell.version {
+                Some(version) => format!("{} ({version})", shell.name),
+                None => shell.name.clone(),
+            })
             .collect();
         let found = if names.is_empty() {
             "No local shell found; the login shell starts".to_string()
