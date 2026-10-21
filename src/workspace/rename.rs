@@ -6,9 +6,9 @@ use gpui::{AppContext, Context, EntityId, Focusable, Window};
 use super::Workspace;
 
 impl Workspace {
-    /// Opens a field over session `index`'s title, what it is called selected.
-    pub fn rename(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(session) = self.sessions.get(index) else {
+    /// Opens a field over the session `key`'s title, what it is called selected.
+    pub fn rename(&mut self, key: u64, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(session) = self.session(key) else {
             return;
         };
         if session.editing.is_some() {
@@ -31,8 +31,10 @@ impl Workspace {
             },
         );
         window.focus(&input.focus_handle(cx), cx);
-        log::debug!("app: session {} is renamed in place", index + 1);
-        self.sessions[index].editing = Some((input, events));
+        log::debug!("app: session {key} is renamed in place");
+        if let Some(session) = self.session_mut(key) {
+            session.editing = Some((input, events));
+        }
         cx.notify();
     }
 
@@ -68,7 +70,7 @@ impl Workspace {
                 log::info!("app: session {pid} is named {:?}", session.name);
             }
         }
-        if held && let Some(shown) = self.sessions.get(self.active) {
+        if held && let Some(shown) = self.session(self.active) {
             window.focus(&shown.terminal.focus_handle(cx), cx);
         }
         self.retitle(window);

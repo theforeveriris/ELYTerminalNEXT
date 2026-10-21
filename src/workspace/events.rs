@@ -12,48 +12,50 @@ impl Workspace {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let Some(index) = self
+        let Some(session) = self
             .sessions
             .iter()
             .position(|session| session.terminal.entity_id() == id)
         else {
             return;
         };
-        let session = &mut self.sessions[index];
+        let key = self.sessions[session].id;
+        let shown = key == self.active;
+        let session = &mut self.sessions[session];
         match event {
             TerminalEvent::Title(title) => {
-                log::debug!("app: session {}'s program names it {title:?}", index + 1);
+                log::debug!("app: session {key}'s program names it {title:?}");
                 session.title.clone_from(title);
             }
             TerminalEvent::Folder(folder) => {
                 session.folder.clone_from(folder);
                 session.reports = true;
-                if index == self.active {
+                if shown {
                     self.files.update(cx, |files, cx| files.show(folder, cx));
                     self.git.update(cx, |git, cx| git.show(folder, cx));
                 }
             }
-            TerminalEvent::Bell if index != self.active => {
+            TerminalEvent::Bell if !shown => {
                 if !session.bell {
-                    log::debug!("app: a bell in hidden session {}", index + 1);
+                    log::debug!("app: a bell in hidden session {key}");
                 }
                 session.bell = true;
             }
             TerminalEvent::Bell => {}
             // A hidden session that starts waiting marks its row until it is shown.
-            TerminalEvent::Shows(Some(State::Blocked)) if index != self.active => {
-                log::debug!("app: hidden session {} waits", index + 1);
+            TerminalEvent::Shows(Some(State::Blocked)) if !shown => {
+                log::debug!("app: hidden session {key} waits");
                 session.waiting = true;
             }
             TerminalEvent::Shows(_) => {}
             TerminalEvent::Exited(status) => {
                 let pid = session.terminal.read(cx).pid();
                 log::info!("app: session {pid}'s program ended, {status}");
-                self.close(index, window, cx);
+                self.close(key, window, cx);
                 return;
             }
         }
-        if index == self.active {
+        if shown {
             self.retitle(window);
         }
         cx.notify();
@@ -61,21 +63,17 @@ impl Workspace {
 
     /// A press on notification `tag`: its session hears of it and shows, unless it asked not to; false when no session here posted it.
     pub fn pressed(&mut self, tag: &str, window: &mut Window, cx: &mut Context<Self>) -> bool {
-        let found = self
-            .sessions
-            .iter()
-            .enumerate()
-            .find_map(|(index, session)| {
-                let focus = session.terminal.update(cx, |view, _| view.pressed(tag))?;
-                Some((index, focus))
-            });
-        let Some((index, focus)) = found else {
+        let found = self.sessions.iter().find_map(|session| {
+            let focus = session.terminal.update(cx, |view, _| view.pressed(tag))?;
+            Some((session.id, focus))
+        });
+        let Some((id, focus)) = found else {
             return false;
         };
         if focus {
             cx.activate(true);
             window.activate_window();
-            self.select(index, window, cx);
+            self.select(id, window, cx);
         }
         true
     }

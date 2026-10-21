@@ -23,6 +23,8 @@ use orb::Look;
 
 /// A program on its own terminal, as the sessions column lists it.
 pub struct Session {
+    /// Its id, which stays the same as it moves between tabs and closes.
+    pub id: u64,
     pub terminal: Entity<TerminalView>,
     /// The program's title; empty while it names none.
     pub title: String,
@@ -104,10 +106,10 @@ pub fn after_close(active: usize, closed: usize, left: usize) -> usize {
     }
 }
 
-/// Session `index`'s row: its title and folder, the mark of its status, a bell while one rang unseen, a button that closes it.
+/// Session `id`'s row: its title and folder, the mark of its status, a bell while one rang unseen, a button that closes it.
 pub fn row(
     workspace: &Entity<Workspace>,
-    index: usize,
+    id: u64,
     session: &Session,
     active: bool,
     home: Option<&Path>,
@@ -126,8 +128,8 @@ pub fn row(
         .on_click(
             move |event, window, cx| match (editing, event.click_count()) {
                 (true, _) => {}
-                (false, 2..) => select.update(cx, |this, cx| this.rename(index, window, cx)),
-                (false, _) => select.update(cx, |this, cx| this.select(index, window, cx)),
+                (false, 2..) => select.update(cx, |this, cx| this.rename(id, window, cx)),
+                (false, _) => select.update(cx, |this, cx| this.select(id, window, cx)),
             },
         )
         .trailing(
@@ -137,7 +139,7 @@ pub fn row(
                 .tooltip("Close session")
                 .on_click(move |_, window, cx| {
                     cx.stop_propagation();
-                    close.update(cx, |this, cx| this.close(index, window, cx))
+                    close.update(cx, |this, cx| this.close(id, window, cx))
                 }),
         );
     let item = match &session.editing {

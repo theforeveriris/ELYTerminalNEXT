@@ -1,26 +1,16 @@
 use std::time::Instant;
 
-use ely_gpui_component::{
-    buttons::{ButtonVariant, IconButton, SegmentedControl},
-    lists::List,
-    primitives::{FocusScope, IconName},
-    shell::{ColumnShell, ResizeBorder, ShellColumn},
-    theme::ControlSize,
-    typography::Caption,
-};
 use gpui::{
-    Action, App, AppContext, Context, Entity, FocusHandle, Focusable, InteractiveElement,
-    IntoElement, KeyBinding, ParentElement, Render, SharedString, StatefulInteractiveElement,
-    StyleRefinement, Styled, Subscription, Task, Window, actions, div, prelude::FluentBuilder,
+    Action, App, AppContext, Context, Entity, FocusHandle, Focusable, KeyBinding, Subscription,
+    Task, Window, actions,
 };
 
 use crate::{
     blur::Blur,
     files::Files,
     git::panel::{Acted, GitPanel},
-    menus,
-    sessions::{self, Session, orb},
-    settings::{PanelTab, Settings, SettingsStore, StartIn, window::OpenSettings},
+    sessions::{Session, orb},
+    settings::{Settings, SettingsStore, StartIn},
     term::{
         Events, Launch, Pty, TerminalView, config,
         shell::{ShellIntegration, launch},
@@ -29,9 +19,13 @@ use crate::{
 };
 
 mod events;
+mod layout;
 mod rename;
+mod tabs;
+mod view;
 mod widths;
 
+use layout::{Direction, Pane, SessionId, Tab};
 use widths::{Dragged, Side};
 
 actions!(
@@ -43,7 +37,15 @@ actions!(
         CloseSession,
         NextSession,
         PreviousSession,
-        LastSession
+        LastSession,
+        NewTab,
+        CloseTab,
+        NextTab,
+        PreviousTab,
+        LastTab,
+        SplitRight,
+        SplitDown,
+        ClosePane
     ]
 );
 
@@ -51,6 +53,16 @@ actions!(
 #[derive(Clone, Debug, PartialEq, Action)]
 #[action(namespace = elyterminal, no_json)]
 pub struct SelectSession(pub usize);
+
+/// Shows the tab at this place, from 0.
+#[derive(Clone, Debug, PartialEq, Action)]
+#[action(namespace = elyterminal, no_json)]
+pub struct SelectTab(pub usize);
+
+/// Moves the focus to the pane in this direction.
+#[derive(Clone, Debug, PartialEq, Action)]
+#[action(namespace = elyterminal, no_json)]
+pub struct FocusPane(pub Direction);
 
 /// The key context of the main window's content.
 pub const CONTEXT: &str = "Workspace";
@@ -71,27 +83,72 @@ pub fn bind_keys(cx: &mut App) {
             "alt",
         )
     };
+    // The tabs and the panes, as Ghostty binds them.
+    let (tab_new, tab_close, split, split_down, pane) = if cfg!(target_os = "macos") {
+        ("cmd-t", "cmd-w", "cmd-d", "cmd-shift-d", "cmd-alt")
+    } else {
+        (
+            "ctrl-shift-t",
+            "ctrl-shift-w",
+            "ctrl-shift-d",
+            "ctrl-shift-alt-d",
+            "ctrl-shift-alt",
+        )
+    };
     let context = Some(CONTEXT);
     cx.bind_keys([
         KeyBinding::new(sessions, ToggleSessions, context),
         KeyBinding::new(panel, TogglePanel, context),
+    ]);
+    // The tabs take the plain keys, and the sessions the shifted ones.
+    cx.bind_keys([
+        KeyBinding::new(tab_new, NewTab, context),
+        KeyBinding::new(tab_close, CloseTab, context),
+        KeyBinding::new(split, SplitRight, context),
+        KeyBinding::new(split_down, SplitDown, context),
+        KeyBinding::new(&format!("{pane}-w"), ClosePane, context),
+    ]);
+    cx.bind_keys([
         KeyBinding::new(new, NewSession, context),
         KeyBinding::new(close, CloseSession, context),
-        KeyBinding::new("ctrl-tab", NextSession, context),
-        KeyBinding::new("ctrl-shift-tab", PreviousSession, context),
-        KeyBinding::new(&format!("{digit}-9"), LastSession, context),
+        KeyBinding::new("ctrl-tab", NextTab, context),
+        KeyBinding::new("ctrl-shift-tab", PreviousTab, context),
+        KeyBinding::new(&format!("{digit}-9"), LastTab, context),
+        // The sessions step within the shown tab.
+        KeyBinding::new("ctrl-shift-right", NextSession, context),
+        KeyBinding::new("ctrl-shift-left", PreviousSession, context),
+        KeyBinding::new(&format!("{digit}-shift-9"), LastSession, context),
     ]);
     cx.bind_keys(
-        (1..=8).map(|n| KeyBinding::new(&format!("{digit}-{n}"), SelectSession(n - 1), context)),
+        (1..=8).map(|n| KeyBinding::new(&format!("{digit}-{n}"), SelectTab(n - 1), context)),
     );
+    cx.bind_keys(
+        (1..=8)
+            .map(|n| KeyBinding::new(&format!("{digit}-shift-{n}"), SelectSession(n - 1), context)),
+    );
+    cx.bind_keys([
+        KeyBinding::new(&format!("{pane}-left"), FocusPane(Direction::Left), context),
+        KeyBinding::new(
+            &format!("{pane}-right"),
+            FocusPane(Direction::Right),
+            context,
+        ),
+        KeyBinding::new(&format!("{pane}-up"), FocusPane(Direction::Up), context),
+        KeyBinding::new(&format!("{pane}-down"), FocusPane(Direction::Down), context),
+    ]);
 }
 
 /// The main window's content: sessions, the terminal, and Git or Files, in Ely's columns.
 pub struct Workspace {
     focus: FocusHandle,
+    /// Every session, by its id.
     sessions: Vec<Session>,
-    /// The session shown.
-    active: usize,
+    /// The tabs of the window, each a page of panes.
+    tabs: Vec<Tab>,
+    /// The tab shown.
+    active_tab: usize,
+    /// The session shown, as an id into `sessions`.
+    active: SessionId,
     files: Entity<Files>,
     git: Entity<GitPanel>,
     /// What the window shows of the desktop, and the blur behind it.
@@ -100,6 +157,8 @@ pub struct Workspace {
     dragged: Dragged,
     /// Draws the window at each step of the status marks while one shown moves.
     ticking: Option<Task<()>>,
+    /// The next id a session takes, so an id is never reused.
+    next_id: SessionId,
     _settings: Subscription,
     _acted: Subscription,
 }
@@ -116,29 +175,38 @@ impl Workspace {
         let git = cx.new(|cx| GitPanel::new(launch.cwd.clone(), window, cx));
         // A change the Git panel made shows in Files' marks too.
         let acted = cx.subscribe(&git, |this, _, _: &Acted, cx| {
-            let folder = this.sessions[this.active].folder.clone();
+            let folder = this
+                .session(this.active)
+                .map(|session| session.folder.clone())
+                .unwrap_or_default();
             this.files.update(cx, |files, cx| files.show(&folder, cx));
         });
         let mut workspace = Self {
             focus: cx.focus_handle(),
             sessions: Vec::new(),
+            tabs: Vec::new(),
+            active_tab: 0,
             active: 0,
             files: cx.new(|_| Files::new(launch.cwd.clone())),
             git,
             background: Blur::new(window, SettingsStore::get(cx)),
             dragged: Dragged::default(),
             ticking: None,
+            next_id: 1,
             _settings: cx.observe_global_in::<SettingsStore>(window, |this, window, cx| {
                 this.background.follow(window, SettingsStore::get(cx));
                 cx.notify();
             }),
             _acted: acted,
         };
-        workspace.add(pty, events, launch, window, cx);
-        workspace.select(0, window, cx);
+        let first = workspace.add(pty, events, launch, window, cx);
+        workspace.tabs.push(Tab::new(first));
+        workspace.active_tab = 0;
+        workspace.select(first, window, cx);
         workspace
     }
 
+    /// Adds a session, and shows it in a new pane of the shown tab.
     fn add(
         &mut self,
         pty: Pty,
@@ -146,7 +214,7 @@ impl Workspace {
         launch: Launch,
         window: &mut Window,
         cx: &mut Context<Self>,
-    ) {
+    ) -> SessionId {
         let terminal = cx.new(|cx| TerminalView::new(pty, events, window, cx));
         let id = terminal.entity_id();
         let events = cx.subscribe_in(&terminal, window, move |this, _, event, window, cx| {
@@ -154,7 +222,10 @@ impl Workspace {
         });
         let pid = terminal.read(cx).pid();
         log::info!("app: session {pid} opens in {}", launch.cwd.display());
+        let session = self.next_id;
+        self.next_id += 1;
         self.sessions.push(Session {
+            id: session,
             terminal,
             title: String::new(),
             name: String::new(),
@@ -166,6 +237,17 @@ impl Workspace {
             look: None,
             _events: events,
         });
+        session
+    }
+
+    /// The session with the id, if it is still here.
+    fn session(&self, id: SessionId) -> Option<&Session> {
+        self.sessions.iter().find(|session| session.id == id)
+    }
+
+    /// The session with the id, for changing it.
+    fn session_mut(&mut self, id: SessionId) -> Option<&mut Session> {
+        self.sessions.iter_mut().find(|session| session.id == id)
     }
 
     /// Notes each session's mark `now`, and draws the window at each step while one shown moves.
@@ -194,44 +276,87 @@ impl Workspace {
     }
 
     /// A session of the shell the settings name, in home or the shown session's folder.
-    fn new_session(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    fn new_session(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Option<SessionId> {
         let Some(home) = dirs::home_dir() else {
             log::error!("app: no home folder, so no new session");
-            return;
+            return None;
         };
         let settings = SettingsStore::get(cx);
         let folder = match settings.start_in {
             StartIn::Home => home,
             StartIn::Session => self
-                .sessions
-                .get(self.active)
+                .session(self.active)
                 .map_or(home, |session| session.folder.clone()),
         };
         let started = launch(&settings.shell, folder, &cx.global::<ShellIntegration>().0)
             .and_then(|launch| Ok((spawn(&launch, (80, 24), (8, 16), config(settings))?, launch)));
         match started {
-            Ok(((pty, events), launch)) => {
-                self.add(pty, events, launch, window, cx);
-                self.select(self.sessions.len() - 1, window, cx);
+            Ok(((pty, events), launch)) => Some(self.add(pty, events, launch, window, cx)),
+            Err(error) => {
+                log::error!("app: no new session: {error:#}");
+                None
             }
-            Err(error) => log::error!("app: no new session: {error:#}"),
         }
     }
 
-    /// Shows session `index`, clears its bell and its waiting mark, and gives its terminal the keys.
-    pub fn select(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
-        if index >= self.sessions.len() {
+    /// Opens a session in a new pane of the shown tab: beside the only one, or in a split of the focused one.
+    pub fn new_session_in_pane(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(id) = self.new_session(window, cx) else {
+            return;
+        };
+        let Some(tab) = self.tab_mut() else {
+            return;
+        };
+        if tab.panes.len() == 1 {
+            // The first pane keeps its session; the new one joins it.
+            tab.panes.push(Pane {
+                session: id,
+                width: 5,
+                height: 10,
+            });
+            tab.focused = 1;
+        } else {
+            // A tab with panes splits the focused one, and the new session takes it.
+            tab.split(true, id);
+        }
+        self.select(id, window, cx);
+    }
+
+    /// The tab and the pane that hold the session `id`.
+    fn where_is(&self, id: SessionId) -> Option<(usize, usize)> {
+        self.tabs.iter().enumerate().find_map(|(at, tab)| {
+            tab.panes
+                .iter()
+                .position(|pane| pane.session == id)
+                .map(|pane| (at, pane))
+        })
+    }
+
+    /// Shows the session `id`, clears its bell and its waiting mark, and gives its terminal the keys.
+    pub fn select(&mut self, id: SessionId, window: &mut Window, cx: &mut Context<Self>) {
+        if self.session(id).is_none() {
             return;
         }
-        if index != self.active
-            && let Some(hidden) = self.sessions.get(self.active)
+        // A session in another tab takes that tab and its pane to the front.
+        if let Some((tab, pane)) = self.where_is(id) {
+            if tab != self.active_tab {
+                self.active_tab = tab;
+            }
+            if let Some(tab) = self.tabs.get_mut(tab) {
+                tab.focus(pane);
+            }
+        }
+        if id != self.active
+            && let Some(hidden) = self.session(self.active)
         {
             hidden.terminal.update(cx, |view, cx| {
                 view.let_go(cx);
                 view.set_front(false);
             });
         }
-        let session = &mut self.sessions[index];
+        let Some(session) = self.session_mut(id) else {
+            return;
+        };
         session.bell = false;
         session.waiting = false;
         session.terminal.update(cx, |view, _| view.set_front(true));
@@ -239,31 +364,81 @@ impl Workspace {
         let folder = session.folder.clone();
         self.files.update(cx, |files, cx| files.show(&folder, cx));
         self.git.update(cx, |git, cx| git.show(&folder, cx));
-        self.active = index;
-        log::debug!("app: session {} shown", index + 1);
+        self.active = id;
+        log::debug!("app: session {id} shown");
         self.retitle(window);
         cx.notify();
     }
 
-    /// Closes session `index`; its program hangs up. The last one closes the window.
-    pub fn close(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
-        if index >= self.sessions.len() {
+    /// Closes the session `id`; its program hangs up, and the pane it held goes with it.
+    pub fn close(&mut self, id: SessionId, window: &mut Window, cx: &mut Context<Self>) {
+        if self.session(id).is_none() {
             return;
         }
-        let session = self.sessions.remove(index);
-        log::info!("app: session {} closes", session.terminal.read(cx).pid());
-        if self.sessions.is_empty() {
-            log::info!("app: no session left; the window closes");
+        let pid = self
+            .session(id)
+            .map(|session| session.terminal.read(cx).pid());
+        log::info!("app: session {id} closes");
+        // The session leaves the list, and every pane that held it.
+        self.sessions.retain(|session| session.id != id);
+        for tab in &mut self.tabs {
+            tab.panes.retain(|pane| pane.session != id);
+            if tab.focused >= tab.panes.len() {
+                tab.focused = tab.panes.len().saturating_sub(1);
+            }
+        }
+        // A tab with no pane is gone.
+        let emptied: Vec<usize> = self
+            .tabs
+            .iter()
+            .enumerate()
+            .filter(|(_, tab)| tab.panes.is_empty())
+            .map(|(at, _)| at)
+            .collect();
+        for at in emptied.into_iter().rev() {
+            self.tabs.remove(at);
+        }
+        if self.tabs.is_empty() {
+            log::info!("app: no tab left; the window closes");
             window.remove_window();
             return;
         }
-        let shown = index == self.active;
-        self.active = sessions::after_close(self.active, index, self.sessions.len());
-        if shown {
-            self.select(self.active, window, cx);
+        if self.active_tab >= self.tabs.len() {
+            self.active_tab = self.tabs.len() - 1;
+        }
+        // The shown session may have gone; the focused pane of the shown tab takes over.
+        let shown = self
+            .tab()
+            .and_then(|tab| tab.focused_session())
+            .unwrap_or(id);
+        if self.session(shown).is_none() {
+            let next = self
+                .tab()
+                .and_then(|tab| tab.focused_session())
+                .or_else(|| self.tabs.first().and_then(|tab| tab.focused_session()));
+            match next {
+                Some(next) => self.select(next, window, cx),
+                None => {
+                    self.active = 0;
+                    cx.notify();
+                }
+            }
+        } else if self.active == id {
+            self.select(shown, window, cx);
         } else {
             cx.notify();
         }
+        let _ = pid;
+    }
+
+    /// The tab shown.
+    fn tab(&self) -> Option<&Tab> {
+        self.tabs.get(self.active_tab)
+    }
+
+    /// The tab shown, for changing it.
+    fn tab_mut(&mut self) -> Option<&mut Tab> {
+        self.tabs.get_mut(self.active_tab)
     }
 
     /// Its sessions, in their rows' order.
@@ -273,7 +448,7 @@ impl Workspace {
 
     /// What the shown session is called.
     fn title(&self) -> &str {
-        self.sessions.get(self.active).map_or(TITLE, Session::named)
+        self.session(self.active).map_or(TITLE, Session::named)
     }
 
     fn retitle(&self, window: &mut Window) {
@@ -303,192 +478,17 @@ impl Workspace {
     /// Shows the next session, or the one before, round the ends.
     fn step(&mut self, forward: bool, window: &mut Window, cx: &mut Context<Self>) {
         let count = self.sessions.len();
+        if count == 0 {
+            return;
+        }
         let by = if forward { 1 } else { count - 1 };
-        self.select((self.active + by) % count, window, cx);
-    }
-}
-
-/// Shows Git or Files in the right column, as the settings keep it.
-fn show_tab(value: &SharedString, cx: &mut App) {
-    let panel = match value.as_ref() {
-        "git" => PanelTab::Git,
-        "files" => PanelTab::Files,
-        other => unreachable!("app: no {other} tab"),
-    };
-    if SettingsStore::get(cx).panel == panel {
-        return;
-    }
-    match SettingsStore::update(cx, |settings| settings.panel = panel) {
-        Ok(()) => log::info!("app: the right column shows {panel:?}"),
-        Err(error) => log::error!("app: the right column stays: {error:#}"),
-    }
-}
-
-/// A header button that hides or shows a column, saved.
-fn column_toggle(
-    workspace: &Entity<Workspace>,
-    (id, icon): (&'static str, IconName),
-    tip: String,
-    flip: fn(&mut Settings),
-) -> IconButton {
-    let workspace = workspace.clone();
-    IconButton::new(id, icon)
-        .variant(ButtonVariant::Ghost)
-        .size(ControlSize::Sm)
-        .tooltip(tip)
-        .on_click(move |_, _, cx| workspace.update(cx, |this, cx| this.toggle(flip, cx)))
-}
-
-impl Render for Workspace {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        self.background.fit(window);
-        let now = Instant::now();
-        self.tick(now, cx);
-        let settings = SettingsStore::get(cx);
-        let workspace = cx.entity();
-        let tip =
-            |shown: bool, what: &str| format!("{} {what}", if shown { "Hide" } else { "Show" });
-        // It leads the first column or ends the last.
-        let left = column_toggle(
-            &workspace,
-            ("toggle-sessions", IconName::PanelLeft),
-            tip(settings.show_sessions, "sessions"),
-            |settings| settings.show_sessions = !settings.show_sessions,
-        );
-        let right = column_toggle(
-            &workspace,
-            ("toggle-panel", IconName::PanelRight),
-            tip(settings.show_panel, "Git and Files"),
-            |settings| settings.show_panel = !settings.show_panel,
-        );
-        // No menu bar off macOS: a gear opens Settings.
-        let gear = (!cfg!(target_os = "macos")).then(|| {
-            IconButton::new("open-settings", IconName::Settings)
-                .variant(ButtonVariant::Ghost)
-                .size(ControlSize::Sm)
-                .tooltip("Settings")
-                .on_click(|_, window, cx| window.dispatch_action(Box::new(OpenSettings), cx))
-        });
-        let end = div()
-            .flex()
-            .items_center()
-            .gap_2()
-            .children(gear)
-            .child(right);
-        let mut shell = ColumnShell::new("workspace").glass();
-        let shown = self
-            .sessions
-            .get(self.active)
-            .map(|session| session.terminal.clone());
-        let mut terminal = ShellColumn::new("terminal")
-            .title(self.title().to_string())
-            .children(shown);
-        if settings.show_sessions {
-            let home = dirs::home_dir();
-            let rows = self.sessions.iter().enumerate().map(|(index, session)| {
-                let active = index == self.active;
-                sessions::row(&workspace, index, session, active, home.as_deref(), now, cx)
-            });
-            let list = List::new().children(rows);
-            let new = IconButton::new("new-session", IconName::Plus)
-                .variant(ButtonVariant::Ghost)
-                .size(ControlSize::Sm)
-                .tooltip("New session")
-                .on_click(move |_, window, cx| {
-                    workspace.update(cx, |this, cx| this.new_session(window, cx))
-                });
-            shell = shell.column(
-                self.side_column(Side::Sessions, cx)
-                    .leading(left)
-                    .action(new)
-                    .child(
-                        div()
-                            .id("sessions")
-                            .size_full()
-                            .overflow_y_scroll()
-                            .p_2()
-                            .child(list),
-                    ),
-            );
-        } else {
-            terminal = terminal.leading(left);
-        }
-        if settings.show_panel {
-            let tab = settings.panel;
-            let chosen = match tab {
-                PanelTab::Git => "git",
-                PanelTab::Files => "files",
-            };
-            let switch = SegmentedControl::new("panel-tab", chosen)
-                .segment("git", "Git", None)
-                .segment("files", "Files", None)
-                .size(ControlSize::Sm)
-                .on_change(|value, _, cx| show_tab(value, cx));
-            let quiet = self
-                .sessions
-                .get(self.active)
-                .is_some_and(|session| !session.reports);
-            let caption = || Caption::new("This shell reports no folder.").px_3().pt_2();
-            // Hidden, not dropped, so each keeps its state.
-            let body = |on: bool| {
-                div()
-                    .flex_1()
-                    .min_h_0()
-                    .p_2()
-                    .when(!on, |body| body.hidden())
-            };
-            // Git's list draws every row, so terminal output must not redraw it.
-            let fill = || StyleRefinement::default().size_full();
-            shell = shell.column(terminal).column(
-                self.side_column(Side::Panel, cx)
-                    .action(end)
-                    // Below the title bar, clear of Windows' caption buttons.
-                    .child(div().flex().justify_center().px_2().pt_2().child(switch))
-                    .children(quiet.then(caption))
-                    .child(body(tab == PanelTab::Git).child(self.git.clone().cached(fill())))
-                    .child(body(tab == PanelTab::Files).child(self.files.clone())),
-            );
-        } else {
-            shell = shell.column(terminal.action(end));
-        }
-        // The context sits above the focus root, so its keys work wherever focus is.
-        div()
-            .size_full()
-            .key_context(CONTEXT)
-            .map(menus::window_actions)
-            .on_action(cx.listener(|this, _: &ToggleSessions, _, cx| {
-                this.toggle(
-                    |settings| settings.show_sessions = !settings.show_sessions,
-                    cx,
-                )
-            }))
-            .on_action(cx.listener(|this, _: &TogglePanel, _, cx| {
-                this.toggle(|settings| settings.show_panel = !settings.show_panel, cx)
-            }))
-            .on_action(cx.listener(|this, _: &NewSession, window, cx| this.new_session(window, cx)))
-            .on_action(
-                cx.listener(|this, _: &CloseSession, window, cx| {
-                    this.close(this.active, window, cx)
-                }),
-            )
-            .on_action(cx.listener(|this, _: &NextSession, window, cx| this.step(true, window, cx)))
-            .on_action(
-                cx.listener(|this, _: &PreviousSession, window, cx| this.step(false, window, cx)),
-            )
-            .on_action(cx.listener(|this, _: &LastSession, window, cx| {
-                this.select(this.sessions.len().saturating_sub(1), window, cx)
-            }))
-            .on_action(cx.listener(|this, select: &SelectSession, window, cx| {
-                if select.0 < this.sessions.len() {
-                    this.select(select.0, window, cx);
-                } else {
-                    cx.propagate();
-                }
-            }))
-            .child(
-                ResizeBorder::new()
-                    .when(self.background.see_through(), ResizeBorder::glass)
-                    .child(FocusScope::new(&self.focus).root().size_full().child(shell)),
-            )
+        let next = self.session_order();
+        let at = next
+            .iter()
+            .position(|id| *id == self.active)
+            .map(|at| (at + by) % count)
+            .unwrap_or(0);
+        let id = next[at];
+        self.select(id, window, cx);
     }
 }
