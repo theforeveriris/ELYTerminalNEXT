@@ -54,13 +54,56 @@ impl SettingsWindow {
         } else {
             format!("Found: {}", names.join(", "))
         };
-        let shell = div()
-            .w(cx.theme().prose_width())
-            .flex()
-            .flex_col()
-            .gap_1()
-            .child(PathInput::new("settings-shell", &self.shell))
-            .children((self.refused.clone()).map(|why| InlineMessage::new(Severity::Danger, why)));
+        let shell = {
+            // Each shell the scan found is a choice; the path field below stays for one it did not find.
+            let choices: Vec<ely_gpui_component::forms::Choice> = cx
+                .global::<Shells>()
+                .0
+                .iter()
+                .map(|each| {
+                    let label = match &each.version {
+                        Some(version) => format!("{} ({version})", each.name),
+                        None => each.name.clone(),
+                    };
+                    ely_gpui_component::forms::Choice::new(
+                        each.program.display().to_string(),
+                        label,
+                    )
+                })
+                .collect();
+
+            let select = (!choices.is_empty()).then(|| {
+                let this = this.clone();
+                let shell = self.shell.clone();
+                let at_once = choices.clone();
+                ely_gpui_component::forms::Select::new("settings-shell-picker", choices)
+                    .selected(settings.shell.clone())
+                    .placeholder(language::message(cx, "settings.terminal.shell.default"))
+                    .size(ControlSize::Sm)
+                    .on_change(move |value, _, cx| {
+                        let chosen = value.to_string();
+                        let path = match at_once.iter().any(|choice| choice.value == *value) {
+                            true => chosen.clone(),
+                            false => String::new(),
+                        };
+                        if super::set(&this, format!("shell is {path:?}"), cx, |settings| {
+                            settings.shell = path.clone()
+                        }) {
+                            shell.update(cx, |field, cx| field.set_text(path.clone(), cx));
+                        }
+                    })
+            });
+            div()
+                .w(cx.theme().prose_width())
+                .flex()
+                .flex_col()
+                .gap_1()
+                .children(select)
+                .child(PathInput::new("settings-shell", &self.shell))
+                .children(
+                    (self.refused.clone()).map(|why| InlineMessage::new(Severity::Danger, why)),
+                )
+        };
         let start = match settings.start_in {
             StartIn::Home => "home",
             StartIn::Session => "session",
