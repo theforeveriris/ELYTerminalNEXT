@@ -492,17 +492,4 @@ impl Workspace {
     pub fn sessions(&self) -> &[Session] {
         &self.sessions
     }
-
-    /// What the shown session is called.
-    fn title(&self) -> &str {
-        self.session(self.active).map_or(TITLE, Session::named)
-    }
-
-    fn retitle(&self, window: &mut Window) {
-        let title = self.title();
-        if window.window_title() != title {
-            log::debug!("app: the title is {title:?}");
-            window.set_window_title(title);
-        }
-    }
 }

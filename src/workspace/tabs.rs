@@ -2,8 +2,8 @@
 
 use gpui::{AppContext, Context, Window};
 
-use super::Workspace;
 use super::layout::{Direction, SessionId, Tab};
+use super::{TITLE, Workspace};
 use crate::sessions::Session;
 use crate::settings::{Settings, SettingsStore};
 use crate::term::shell::{ShellIntegration, launch};
@@ -298,6 +298,19 @@ impl Workspace {
         }
         if let Some(id) = self.tab().and_then(|tab| tab.focused_session()) {
             self.select(id, window, cx);
+        }
+    }
+
+    /// What the shown session is called.
+    pub(super) fn title(&self) -> &str {
+        self.session(self.active).map_or(TITLE, Session::named)
+    }
+
+    pub(super) fn retitle(&self, window: &mut Window) {
+        let title = self.title();
+        if window.window_title() != title {
+            log::debug!("app: the title is {title:?}");
+            window.set_window_title(title);
         }
     }
 }
