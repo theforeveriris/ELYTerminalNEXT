@@ -22,6 +22,7 @@ mod layout;
 mod mru;
 mod rename;
 mod restore;
+mod status;
 mod tabs;
 mod view;
 mod widths;

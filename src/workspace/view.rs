@@ -20,7 +20,7 @@ use super::{
     CONTEXT, CloneSession, ClosePane, CloseSession, CloseTab, FocusPane, LastSession, LastTab,
     NewSession, NewTab, NextSession, NextTab, NextUsed, PreviousSession, PreviousTab, PreviousUsed,
     SelectSession, SelectTab, Side, SplitDown, SplitRight, SwapPane, TogglePanel, ToggleSessions,
-    Workspace, Zen, ZoomPane, badge,
+    Workspace, Zen, ZoomPane, badge, status,
 };
 use crate::menus;
 use crate::sessions::{self, Session};
@@ -292,6 +292,18 @@ impl Render for Workspace {
         let mut terminal = ShellColumn::new("terminal")
             .title(self.title().to_string())
             .child(self.panes());
+        // STAT-14: a line under the terminal says where the session sits, its size and its branch.
+        // Its cells are read here, before the pane is drawn, from the grid the session holds.
+        let cells = self
+            .session(self.active)
+            .map(|session| {
+                let term = session.terminal.read(cx).size();
+                (
+                    i32::try_from(term.0).unwrap_or(0),
+                    i32::try_from(term.1).unwrap_or(0),
+                )
+            })
+            .map(|cells| status::of(self.session(self.active), cells));
         // STAT-17: which branch the shown session's folder sits in, when it sits in one.
         let badge = self
             .session(self.active)
@@ -299,6 +311,15 @@ impl Render for Workspace {
             .map(|branch| Caption::new(SharedString::from(branch.label())));
         if let Some(badge) = badge {
             terminal = terminal.action(badge);
+        }
+        if let Some(line) = cells {
+            let shown = div()
+                .flex()
+                .items_center()
+                .px_2()
+                .py_1()
+                .child(Caption::new(SharedString::from(line)));
+            terminal = terminal.child(shown);
         }
         if self.tabs.is_empty() {
             // A session that would not start says why, in words the user can copy into an issue.

@@ -192,6 +192,11 @@ impl TerminalView {
         self.pty.pid
     }
 
+    /// The cells its grid holds now: columns and lines.
+    pub fn size(&self) -> (usize, usize) {
+        self.size
+    }
+
     /// What programs in this terminal say they are doing.
     pub fn records(&self) -> &Records {
         &self.records
