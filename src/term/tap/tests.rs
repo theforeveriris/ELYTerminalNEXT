@@ -147,6 +147,23 @@ fn mouse_modes_read_through_controls_as_the_parser_does() {
 }
 
 #[test]
+fn an_old_alternate_screen_is_passed_on_as_the_one_vte_reads() {
+    let mut modes = Modes::default();
+    assert!(modes.forward.is_none());
+    modes.feed(b"\x1b[?47h");
+    assert_eq!(modes.forward.take().as_deref(), Some(&b"\x1b[?1049h"[..]));
+    modes.feed(b"\x1b[?1048l");
+    assert_eq!(modes.forward.take().as_deref(), Some(&b"\x1b[?1049l"[..]));
+    modes.feed(b"\x1b[?1047;25h");
+    assert_eq!(modes.forward.take().as_deref(), Some(&b"\x1b[?1049h"[..]));
+    modes.feed(b"\x1b[?1000h\x1b[?25l");
+    assert!(
+        modes.forward.is_none(),
+        "the modes vte holds stay as they are"
+    );
+}
+
+#[test]
 fn a_local_uri_gives_its_decoded_folder() {
     assert_eq!(
         folder(b"file:///tmp/ely%20dir"),

@@ -22,6 +22,8 @@ pub(crate) struct Modes {
     /// Past a `:`, whose subparameters the parser's mode sets skip.
     sub: bool,
     pub(super) mode: MouseMode,
+    /// What the tap writes to the parser in place of a sequence vte cannot read.
+    pub(super) forward: Option<Vec<u8>>,
     /// Keys go as Windows' records, as ConPTY asks; a full reset ends it, as in Windows Terminal.
     #[cfg(windows)]
     pub(super) win32: bool,
@@ -87,6 +89,19 @@ impl Modes {
                         if mode == crate::term::win32::MODE {
                             self.win32 = byte == b'h';
                         }
+                    }
+                    // The old alternate screens ask for the same screen 1049 does, as xterm says; the
+                    // tap writes them on to the parser as 1049 asks, since vte holds none of them.
+                    if self
+                        .params
+                        .iter()
+                        .any(|mode| matches!(mode, 47 | 1047 | 1048))
+                    {
+                        self.forward = Some({
+                            let mut out = b"\x1b[?1049".to_vec();
+                            out.push(byte);
+                            out
+                        });
                     }
                     Csi::Ground
                 }

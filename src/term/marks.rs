@@ -114,6 +114,26 @@ pub(crate) fn failed_with(options: &[u8]) -> Option<&str> {
     })
 }
 
+/// The command id and error an OSC 133 mark carries, for a session that pairs a prompt with its
+/// command and keeps why it failed: `Some` for a D with `err`, and the `aid` both marks may name.
+pub(crate) fn options(body: &[u8]) -> (Option<String>, Option<String>) {
+    let Some((&letter, rest)) = body.split_first() else {
+        return (None, None);
+    };
+    let options = rest
+        .strip_prefix(b";")
+        .filter(|_| letter == b'A' || letter == b'D');
+    match (letter, options) {
+        (b'A' | b'D', Some(options)) => (
+            aid(options).map(str::to_owned),
+            (letter == b'D')
+                .then(|| failed_with(options).map(str::to_owned))
+                .flatten(),
+        ),
+        _ => (None, None),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -148,6 +168,22 @@ mod tests {
         for body in [&b""[..], b"L", b"P;k=s", b"AB", b"Q", b"a"] {
             assert_eq!(read(body), None, "{}", String::from_utf8_lossy(body));
         }
+    }
+
+    #[test]
+    fn a_mark_s_aid_and_its_error_are_read_for_the_session() {
+        assert_eq!(
+            options(b"A;aid=3;cl=line"),
+            (Some("3".into()), None),
+            "a prompt names its command"
+        );
+        assert_eq!(
+            options(b"D;2;aid=3;err=no such file"),
+            (Some("3".into()), Some("no such file".into()))
+        );
+        assert_eq!(options(b"D;0"), (None, None), "no aid, no error");
+        assert_eq!(options(b"B;aid=3"), (None, None), "only A and D carry them");
+        assert_eq!(options(b""), (None, None));
     }
 
     #[test]

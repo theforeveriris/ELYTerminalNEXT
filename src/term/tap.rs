@@ -92,8 +92,19 @@ impl<P: EventedReadWrite> io::Read for Tapped<P> {
                 log::debug!("pty {pid}: win32-input-mode after its session closed");
             }
         }
+        let held = self.prompts.held();
         let out = self.prompts.pass(&buf[..count]);
         buf[..out.len()].copy_from_slice(out);
+        // A sequence vte cannot read goes on as the one it stands for, where there is room for it.
+        if let Some(forward) = self.modes.forward.take() {
+            let written = held + out.len() + forward.len();
+            if written <= buf.len() {
+                buf[out.len()..written].copy_from_slice(&forward);
+                log::debug!("pty {pid}: an old alternate screen reads as 1049");
+                return Ok(written);
+            }
+            log::warn!("pty {pid}: no room to pass an old alternate screen on");
+        }
         Ok(out.len())
     }
 }
@@ -123,11 +134,16 @@ fn report(
         },
         Found::Osc(body, length) => {
             // VS Code's shell integration writes the same marks as OSC 633; both read alike.
-            if let Some(mark) = body
+            let marks = body
                 .strip_prefix(b"133;")
-                .or_else(|| body.strip_prefix(b"633;"))
-                .and_then(marks::read)
-            {
+                .or_else(|| body.strip_prefix(b"633;"));
+            if let Some(mark) = marks.as_ref().and_then(|body| {
+                let (aid, err) = marks::options(body);
+                if aid.is_some() || err.is_some() {
+                    log::debug!("pty {pid}: the mark says aid {aid:?}, err {err:?}");
+                }
+                marks::read(body)
+            }) {
                 log::debug!("pty {pid}: {mark:?}");
                 PtyEvent::Mark(mark)
             } else if let Some(status) = body
