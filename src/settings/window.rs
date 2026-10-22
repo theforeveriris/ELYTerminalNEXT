@@ -105,6 +105,8 @@ pub struct SettingsWindow {
     editor: Entity<TextInput>,
     /// The template the window's title is composed from.
     window_title: Entity<TextInput>,
+    /// The name a custom theme is saved under.
+    theme_name: Entity<TextInput>,
     /// The start folder a fixed start reads.
     start_folder: Entity<TextInput>,
     /// The shortcut list's search.
@@ -165,6 +167,11 @@ impl SettingsWindow {
             SettingsStore::get(cx).window_title.clone(),
             |settings, text| settings.window_title = text,
         );
+        // Not a setting: the name is read when the save button is pressed, then cleared.
+        let theme_name = cx.new(|cx| {
+            TextInput::new(window, cx)
+                .placeholder(language::message(cx, "settings.custom.name_hint"))
+        });
 
         let font = cx.new(|cx| TextInput::new(window, cx));
         let search = cx.new(|cx| {
@@ -198,6 +205,7 @@ impl SettingsWindow {
             start_folder,
             editor,
             window_title,
+            theme_name,
             search,
             refused: None,
             failed: None,

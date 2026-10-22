@@ -72,8 +72,7 @@ pub fn bind(cx: &mut App) {
         KeyBinding::new("ctrl-shift-alt-pageup", MoveTabUp, context),
         KeyBinding::new("ctrl-shift-alt-pagedown", MoveTabDown, context),
         KeyBinding::new("ctrl-shift-alt-p", PinTab, context),
-        // INP-14: the searchable list of every key, where the settings window keeps it. Shift turns
-        // the slash into a question mark on most layouts, so both spellings bind.
+        // INP-14: the searchable list of every key, where the settings window keeps it; Shift turns the slash into a question mark on most layouts, so both spellings bind.
         KeyBinding::new(
             "ctrl-shift-/",
             crate::settings::window::OpenSettings,

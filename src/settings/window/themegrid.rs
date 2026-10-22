@@ -25,22 +25,27 @@ pub(super) fn grid(
         ("theme", Some(settings.theme.as_str()))
     };
     let omarchy = cx.try_global::<themes::Omarchy>().map(|omarchy| &omarchy.0);
-    // The theme of the user's own colors, alongside the built-in ones.
+    // The theme of the user's own colors, alongside the built-in ones, then the ones they saved.
     let custom = themes::custom(&settings.custom_colors);
+    let saved: Vec<themes::TerminalTheme> =
+        settings.saved_themes.iter().map(themes::saved).collect();
     let cards = omarchy
         .into_iter()
         .chain(themes::all())
+        .chain(saved.iter())
         .map(|each| {
-            let (id, this) = (each.id, this.clone());
+            let id = each.id.clone();
+            let chosen_here = chosen == Some(id.as_ref());
+            let this = this.clone();
             let key = SharedString::from(format!("{field}-{id}"));
-            RadioCard::new(key, chosen == Some(id), each.name)
+            RadioCard::new(key, chosen_here, each.name.clone())
                 .preview(super::preview::preview(each, cx))
                 .on_select(move |_, cx| {
                     set(&this, format!("{field} is {id}"), cx, |settings| {
                         if dark {
-                            settings.dark_theme = Some(id.into());
+                            settings.dark_theme = Some(id.to_string());
                         } else {
-                            settings.theme = id.into();
+                            settings.theme = id.to_string();
                         }
                     });
                 })
@@ -49,7 +54,7 @@ pub(super) fn grid(
             let id = themes::CUSTOM;
             let this = this.clone();
             let key = SharedString::from(format!("{field}-{id}"));
-            RadioCard::new(key, chosen == Some(id), custom.name)
+            RadioCard::new(key, chosen == Some(id), custom.name.clone())
                 .preview(super::preview::preview(&custom, cx))
                 .on_select(move |_, cx| {
                     set(&this, format!("{field} is {id}"), cx, |settings| {

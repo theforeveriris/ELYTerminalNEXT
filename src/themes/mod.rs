@@ -5,7 +5,7 @@ pub mod import;
 #[cfg(target_os = "linux")]
 pub mod omarchy;
 
-use std::sync::LazyLock;
+use std::{borrow::Cow, sync::LazyLock};
 
 use anyhow::Context as _;
 use ely_gpui_component::theme::Palette;
@@ -19,8 +19,8 @@ use crate::settings::Settings;
 /// What a terminal paints with. Ely's own themes keep Ely's palette for the chrome.
 #[derive(Clone, Debug, PartialEq)]
 pub struct TerminalTheme {
-    pub id: &'static str,
-    pub name: &'static str,
+    pub id: Cow<'static, str>,
+    pub name: Cow<'static, str>,
     pub background: Hsla,
     pub foreground: Hsla,
     pub cursor: Hsla,
@@ -126,9 +126,8 @@ pub fn all() -> &'static [TerminalTheme] {
 }
 
 pub fn find(id: &str) -> Option<&'static TerminalTheme> {
-    all().iter().find(|theme| theme.id == id)
+    all().iter().find(|theme| theme.id.as_ref() == id)
 }
-
 /// A theme the settings may name: built in, the user's own, or Omarchy's on Linux.
 pub fn known(id: &str) -> bool {
     find(id).is_some() || id == CUSTOM || (cfg!(target_os = "linux") && id == OMARCHY)
@@ -158,8 +157,8 @@ pub fn chosen(settings: &Settings, appearance: WindowAppearance) -> &str {
 /// The theme of the user's own colors, as a terminal theme.
 pub fn custom(colors: &Colors) -> TerminalTheme {
     TerminalTheme {
-        id: CUSTOM,
-        name: "Custom",
+        id: Cow::Borrowed(CUSTOM),
+        name: Cow::Borrowed("Custom"),
         background: colors.background,
         foreground: colors.foreground,
         cursor: colors.cursor,
@@ -171,6 +170,14 @@ pub fn custom(colors: &Colors) -> TerminalTheme {
     }
 }
 
+/// A theme the user named and kept, as a terminal theme.
+pub fn saved(theme: &custom::SavedTheme) -> TerminalTheme {
+    let mut terminal = custom(&theme.colors);
+    terminal.id = Cow::Owned(theme.id.clone());
+    terminal.name = Cow::Owned(theme.name.clone());
+    terminal
+}
+
 /// The chosen theme's colors; Omarchy's come from its global.
 pub fn active(settings: &Settings, appearance: WindowAppearance, cx: &App) -> TerminalTheme {
     let id = chosen(settings, appearance);
@@ -180,6 +187,9 @@ pub fn active(settings: &Settings, appearance: WindowAppearance, cx: &App) -> Te
     if id == CUSTOM {
         return custom(&settings.custom_colors);
     }
+    if let Some(kept) = settings.saved_themes.iter().find(|theme| theme.id == id) {
+        return saved(kept);
+    }
     find(id)
         .unwrap_or_else(|| panic!("settings name theme {id}, which validation admits"))
         .clone()
@@ -187,8 +197,8 @@ pub fn active(settings: &Settings, appearance: WindowAppearance, cx: &App) -> Te
 
 fn ely(id: &'static str, name: &'static str, palette: Palette) -> TerminalTheme {
     TerminalTheme {
-        id,
-        name,
+        id: Cow::Borrowed(id),
+        name: Cow::Borrowed(name),
         background: palette.bg,
         foreground: palette.fg,
         cursor: palette.focus,
@@ -231,8 +241,8 @@ fn parse(id: &'static str, name: &'static str, text: &str) -> anyhow::Result<Ter
         colors[index] = color.with_context(|| format!("no palette {index}"))?;
     }
     Ok(TerminalTheme {
-        id,
-        name,
+        id: Cow::Borrowed(id),
+        name: Cow::Borrowed(name),
         background: get("background")?,
         foreground: get("foreground")?,
         cursor: get("cursor-color")?,

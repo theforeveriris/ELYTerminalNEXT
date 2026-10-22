@@ -16,7 +16,7 @@ fn rgb(hex: u32) -> Hsla {
 #[test]
 fn every_bundled_file_parses_with_unique_ids() {
     assert_eq!(all().len(), 14);
-    let mut ids: Vec<_> = all().iter().map(|theme| theme.id).collect();
+    let mut ids: Vec<_> = all().iter().map(|theme| theme.id.clone()).collect();
     ids.sort();
     ids.dedup();
     assert_eq!(ids.len(), 14);
@@ -49,7 +49,7 @@ fn light_and_dark_follow_the_background() {
     let light: Vec<_> = all()
         .iter()
         .filter(|theme| !theme.is_dark())
-        .map(|theme| theme.id)
+        .map(|theme| theme.id.clone())
         .collect();
     assert_eq!(
         light,
@@ -125,7 +125,7 @@ fn tokyo_night() -> String {
 fn omarchys_ghostty_conf_reads_without_its_glass() {
     let rendered = tokyo_night();
     let theme = omarchy::colors(&rendered).expect("Omarchy's file reads");
-    assert_eq!(theme.id, OMARCHY);
+    assert_eq!(theme.id.as_ref(), OMARCHY);
     assert_eq!(theme.background, rgb(0x1a1b26));
     assert_eq!(theme.cursor, rgb(0xc0caf5));
     assert_eq!(theme.cursor_text, theme.background, "Ghostty's default");

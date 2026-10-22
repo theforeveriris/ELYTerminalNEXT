@@ -136,6 +136,8 @@ pub struct Settings {
     pub language: Language,
     /// The colors of the theme of the user's own.
     pub custom_colors: themes::Colors,
+    /// The themes the user named and kept, each a set of colors of their own.
+    pub saved_themes: Vec<themes::custom::SavedTheme>,
     /// Fields a later version wrote; kept in memory, warned about, and dropped on the next save.
     #[serde(flatten)]
     pub extra: HashMap<String, serde_json::Value>,
@@ -187,6 +189,7 @@ impl Default for Settings {
             window_maximized: false,
             language: Language::default(),
             custom_colors: themes::Colors::default(),
+            saved_themes: Vec::new(),
             extra: HashMap::new(),
         }
     }
@@ -255,7 +258,10 @@ impl Settings {
             ("dark_theme", self.dark_theme.as_ref()),
         ] {
             if let Some(id) = id {
-                anyhow::ensure!(themes::known(id), "{field} is {id:?}, no built-in theme");
+                anyhow::ensure!(
+                    themes::known(id) || self.saved_themes.iter().any(|theme| theme.id == *id),
+                    "{field} is {id:?}, no built-in theme and none saved"
+                );
             }
         }
         anyhow::ensure!(!self.font_family.is_empty(), "font_family is empty");

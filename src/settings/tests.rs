@@ -283,7 +283,7 @@ fn an_unknown_theme_fails() {
     };
     assert_eq!(
         settings.validate().expect_err("empty").to_string(),
-        "dark_theme is \"\", no built-in theme"
+        "dark_theme is \"\", no built-in theme and none saved"
     );
     let settings = Settings {
         theme: "mocha".into(),
@@ -291,7 +291,7 @@ fn an_unknown_theme_fails() {
     };
     assert_eq!(
         settings.validate().expect_err("unknown").to_string(),
-        "theme is \"mocha\", no built-in theme"
+        "theme is \"mocha\", no built-in theme and none saved"
     );
 }
 
