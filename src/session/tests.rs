@@ -20,6 +20,7 @@ fn saved(tabs: &[(&str, &str)], active: usize) -> Saved {
             .map(|(name, cwd)| SavedTab {
                 name: name.to_string(),
                 cwd: cwd.to_string(),
+                collapsed: false,
             })
             .collect(),
     }
@@ -29,10 +30,18 @@ fn saved(tabs: &[(&str, &str)], active: usize) -> Saved {
 fn a_saved_window_reads_back() {
     let root = folder("round");
     let path = root.join("session.json");
-    let window = saved(&[("api", "/home/u/api"), ("docs", "/home/u/docs")], 1);
+    let mut window = saved(&[("api", "/home/u/api"), ("docs", "/home/u/docs")], 1);
+    window.tabs[1].collapsed = true;
     save(&path, &window).expect("saves");
     assert_eq!(load(&path).expect("loads"), window);
     fs::remove_dir_all(&root).expect("cleanup");
+}
+
+#[test]
+fn a_folded_tab_is_open_when_the_file_never_said() {
+    let tab: SavedTab = serde_json::from_str(r#"{"name": "api", "cwd": "/home/u/api"}"#)
+        .expect("an older file reads");
+    assert!(!tab.collapsed, "a tab the file does not fold stays open");
 }
 
 #[test]
@@ -78,6 +87,7 @@ fn a_file_keeping_too_many_tabs_is_cut_and_saved_that_way() {
         .map(|at| SavedTab {
             name: format!("tab {at}"),
             cwd: "/tmp".into(),
+            collapsed: false,
         })
         .collect();
     let window = Saved {

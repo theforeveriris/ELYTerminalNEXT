@@ -6,9 +6,9 @@ use super::layout::{Direction, SessionId, Tab};
 use super::{TITLE, Workspace};
 use crate::sessions::Session;
 use crate::settings::{Settings, SettingsStore};
-use crate::term::shell::{ShellIntegration, launch, launch_found};
+use crate::term::shell::{ShellIntegration, launch};
 use crate::term::{
-    Events, Launch, Pty, Quote, Target, TerminalView, config, opened, pty::failed as failure, spawn,
+    Events, Launch, Pty, TerminalView, config, opened, pty::failed as failure, spawn,
 };
 
 /// How a session is started again as a clone: its program, in the folder it last reported. A clone takes no scrollback and no running state with it, since the terminal is new and only the program, its variables and the folder are the same, so a tab opened beside one in `~/src/api` starts there too.
@@ -129,80 +129,6 @@ impl Workspace {
         log::info!("app: tab {} opens", self.active_tab + 1);
     }
 
-    /// Opens a tab running the shell `found`, in the folder a new session would start in.
-    pub fn new_tab_with(
-        &mut self,
-        found: &crate::term::shell::scan::Found,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        let Some(home) = dirs::home_dir() else {
-            log::error!("app: no home folder, so no {} session", found.name);
-            return;
-        };
-        let settings = SettingsStore::get(cx).clone();
-        let session = self
-            .session(self.active)
-            .map(|session| session.folder.as_path());
-        let folder = settings.start_folder(&home, session);
-        let launch = match launch_found(found, folder, &cx.global::<ShellIntegration>().0) {
-            Ok(launch) => launch,
-            Err(error) => {
-                log::error!("app: no {} session: {error:#}", found.name);
-                return;
-            }
-        };
-        let (pty, events) = match opened(&launch, (80, 24), (8, 16), config(&settings)) {
-            Ok(started) => started,
-            Err(failed) => {
-                log::error!("app: no {} session:\n{}", found.name, failed.report());
-                return;
-            }
-        };
-        let id = self.add(pty, events, launch, window, cx);
-        self.tabs.push(Tab::new(id));
-        self.active_tab = self.tabs.len() - 1;
-        self.select(id, window, cx);
-        log::info!("app: tab {} opens as {}", self.active_tab + 1, found.name);
-    }
-
-    /// Opens a tab on `host`, running the ssh the system has.
-    pub fn connect(&mut self, host: String, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(home) = dirs::home_dir() else {
-            log::error!("app: no home folder, so no ssh to {host}");
-            return;
-        };
-        let ssh = match crate::settings::program_path("ssh") {
-            Ok(ssh) => ssh,
-            Err(error) => {
-                log::error!("app: no ssh to {host}: {error:#}");
-                return;
-            }
-        };
-        let settings = SettingsStore::get(cx).clone();
-        let launch = Launch {
-            program: Some((ssh, vec![host.clone()])),
-            cwd: home,
-            env: Vec::new(),
-            reports: false,
-            quote: Quote::Posix,
-            target: Target::Local,
-        };
-        let started = spawn(&launch, (80, 24), (8, 16), config(&settings));
-        let (pty, events) = match started {
-            Ok(started) => started,
-            Err(error) => {
-                log::error!("app: no ssh to {host}: {error:#}");
-                return;
-            }
-        };
-        let id = self.add(pty, events, launch, window, cx);
-        self.tabs.push(Tab::new(id));
-        self.active_tab = self.tabs.len() - 1;
-        self.select(id, window, cx);
-        log::info!("app: ssh connects to {host}");
-    }
-
     /// Opens a tab with a session of its own: the same program, in the same folder as `id`'s.
     pub fn clone_session(&mut self, id: SessionId, window: &mut Window, cx: &mut Context<Self>) {
         let Some(session) = self.session(id) else {
@@ -315,6 +241,29 @@ impl Workspace {
         self.show_tab(window, cx);
     }
 
+    /// A press on a tab's own row: it folds the shown tab's panes away, unfolds them, or shows a tab it is not on.
+    pub fn tap_tab(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
+        if index >= self.tabs.len() {
+            return;
+        }
+        if index != self.active_tab {
+            self.tabs[index].collapsed = false;
+            self.select_tab(index, window, cx);
+            return;
+        }
+        let tab = &mut self.tabs[index];
+        tab.collapsed = !tab.collapsed;
+        log::info!(
+            "app: tab {} {}",
+            index + 1,
+            match tab.collapsed {
+                true => "folds its panes away",
+                false => "unfolds its panes",
+            }
+        );
+        cx.notify();
+    }
+
     /// Shows the focused pane of the shown tab.
     fn show_tab(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(id) = self.tab().and_then(|tab| tab.focused_session()) {
@@ -342,8 +291,9 @@ impl Workspace {
         let Some(tab) = self.tab_mut() else {
             return;
         };
-        // The split takes the focused pane's room; the new session goes in.
+        // The split takes the focused pane's room; the new session goes in, and the tab opens to show it.
         tab.split(vertical, id);
+        tab.collapsed = false;
         self.select(id, window, cx);
         log::info!(
             "app: the pane splits {}",

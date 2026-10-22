@@ -23,6 +23,7 @@ mod health;
 mod keys;
 mod layout;
 mod mru;
+mod open;
 mod panes;
 mod rename;
 mod restore;

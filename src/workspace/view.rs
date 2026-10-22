@@ -8,9 +8,9 @@ use ely_gpui_component::{
     buttons::{Button, ButtonVariant, IconButton, SegmentedControl},
     forms::Input,
     lists::{List, ListItem},
-    primitives::{FocusScope, IconName},
+    primitives::{Disclosure, FocusScope, IconName},
     shell::{ColumnShell, ResizeBorder, ShellColumn},
-    theme::ControlSize,
+    theme::{ControlSize, IconSize},
     typography::Caption,
 };
 use gpui::{
@@ -107,9 +107,10 @@ impl Workspace {
             }
             let select = workspace.clone();
             let close = workspace.clone();
-            // A tab names its own sessions, so it shows how many it holds.
+            // A tab names its own sessions, so it shows how many it holds; folded, that count is all that is left.
             let count = tab.panes.len();
-            let badge = match (tab.pinned, count > 1) {
+            let folded = tab.collapsed;
+            let badge = match (tab.pinned, count > 1 || folded) {
                 (true, true) => format!("\u{2605} {count}"),
                 (true, false) => "\u{2605}".to_string(),
                 (false, true) => format!("{count}"),
@@ -118,9 +119,10 @@ impl Workspace {
             let tab_row = ListItem::new(("tab", at), title)
                 .selected(shown)
                 .strong(shown)
+                .leading(Disclosure::new(("tab-fold", at), !folded).size(IconSize::Sm))
                 .detail(badge)
                 .on_click(move |_, window, cx| {
-                    select.update(cx, |this, cx| this.select_tab(at, window, cx))
+                    select.update(cx, |this, cx| this.tap_tab(at, window, cx))
                 })
                 .trailing(
                     IconButton::new(("close-tab", at), IconName::X)
@@ -133,8 +135,8 @@ impl Workspace {
                         }),
                 );
             rows.push(tab_row.into_any_element());
-            // The shown tab's panes hang under it, so the column reads as a tree.
-            if !shown {
+            // The shown tab's panes hang under it, so the column reads as a tree; folded, they stay away.
+            if !shown || folded {
                 continue;
             }
             for id in visible {

@@ -57,6 +57,7 @@ impl Workspace {
             let id = self.add(pty, events, launch, window, cx);
             let mut tab = Tab::new(id);
             tab.name = snapshot.name.clone();
+            tab.collapsed = snapshot.collapsed;
             self.tabs.push(tab);
         }
         let active = saved.active.min(self.tabs.len().saturating_sub(1));
@@ -98,6 +99,7 @@ impl Workspace {
                 session::SavedTab {
                     name: tab.name.clone(),
                     cwd,
+                    collapsed: tab.collapsed,
                 }
             })
             .collect();

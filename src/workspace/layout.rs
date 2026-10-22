@@ -42,6 +42,8 @@ pub struct Tab {
     pub name: String,
     /// Whether it stays where it is: a pinned tab is never moved by a reorder, and sits before the rest.
     pub pinned: bool,
+    /// Whether its panes are folded away in the column, leaving only the tab's own row.
+    pub collapsed: bool,
 }
 
 impl Tab {
@@ -52,6 +54,7 @@ impl Tab {
             focused: 0,
             name: String::new(),
             pinned: false,
+            collapsed: false,
         }
     }
 

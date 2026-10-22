@@ -32,6 +32,8 @@ pub struct Saved {
 pub struct SavedTab {
     pub name: String,
     pub cwd: String,
+    /// Whether its panes were folded away in the column.
+    pub collapsed: bool,
 }
 
 /// Where the session file lives.
