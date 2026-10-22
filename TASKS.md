@@ -442,3 +442,10 @@ Progress truth. Top to bottom, one at a time. A task is ticked only after its co
 - [x] T81 A tab moves among its neighbours, and a pinned tab stays in front, as TAB-03 and TAB-04 ask: Ctrl-Shift-Alt-Up and Down move the shown tab a place, Ctrl-Shift-Alt-P pins it, which puts it before the rest and stops it moving or being crossed; the row shows a star beside a pinned tab.
 
   - 标签可在相邻之间移动，固定的标签停在前面，这是 TAB-03 与 TAB-04 所要求的：Ctrl-Shift-Alt-上下 把当前标签移动一位，Ctrl-Shift-Alt-P 固定它，于是它排在前面、不再移动也不被越过；固定的标签行上有一颗星。
+
+## 40. What a program may write, and what failed
+## 40. 程序能写什么，以及哪些失败了
+
+- [x] T82 A program cannot fill the clipboard, and a session names the commands that failed, as SEL-08, STAT-19, FIND-08 and INP-14 ask: an OSC 52 write over 100 KiB is refused and logged, since a program writes without asking; a session's hover names the commands that failed in it, one by its own line and several by count; the settings' shortcut list carries every key this fork adds, and Ctrl-Shift-/ opens it.
+
+  - 程序不能把剪贴板填满，而会话会点名失败过的命令，这是 SEL-08、STAT-19、FIND-08 与 INP-14 所要求的：OSC 52 写入超过 100 KiB 时整条拒绝并记日志，因为程序写入时并不询问；会话的悬停点名其中失败过的命令，一条时直接写出，多条时给出条数；设置的快捷键表收录了本 fork 新增的每个按键，Ctrl-Shift-/ 可打开它。

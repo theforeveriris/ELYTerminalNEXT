@@ -135,6 +135,9 @@
 - **健康检查（future.md §8 第 20 条）**：`Ctrl-Shift-Alt-H` 按一次就能看到这台机器的状况：设置文件能否读出（含未知字段）、四份 shell 集成脚本是否齐全、扫描到的每个 shell 是否仍在原处，报告叠在终端上、一行一条，`-` 表示正常、`!` 表示有问题，同时写入日志。见 `src/health.rs` 与 `src/workspace/health.rs`。
 - **TAB-15**：窗格的宽度与行的高度改成权重，布局按份额伸缩而不是一律对半分；行内窗格之间的边界可横向拖动改宽度，行与行之间的边界可纵向拖动改高度，双击任一边界把该行与各行重新均分，`Ctrl-Shift-Alt-E` 是键盘上的同一件事；拖动到 5% 为止，窗格不会消失。见 `src/workspace/layout.rs` 与 `src/workspace/panes.rs`。
 - **TAB-03 / TAB-04**：`Ctrl-Shift-Alt-↑/↓` 在会话栏里上移/下移当前标签，`Ctrl-Shift-Alt-P` 固定或取消固定；固定标签排在前面、不再移动也不被越过，行上以 `★` 标出。见 `src/workspace/layout.rs` 的 `Tab::move_by` 与 `Tab::pin`。
+- **SEL-08 / SEC-03 / PROTO-16**：OSC 52 写入超过 100 KiB 时整条拒绝并记警告；读取仍默认关闭。见 `src/term/clipboard.rs`。
+- **STAT-19 / FIND-08**：会话行的悬停列出该会话里失败过的命令——一条时直接点名，多条时给出条数再逐条列出；`Ctrl-Shift-Alt-↑/↓` 在终端里跳到上一条/下一条失败命令。见 `src/sessions.rs` 的 `hover` 与 `src/term/blocks.rs` 的 `step`。
+- **INP-14（部分）**：设置 › Terminal 的快捷键表补上本 fork 新增的全部按键并可搜索，`Ctrl-Shift-/` 直接从终端打开它。见 `src/settings/window/terminal.rs`。
 
 ---
 
