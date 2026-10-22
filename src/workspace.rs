@@ -1,4 +1,4 @@
-﻿use std::time::Instant;
+use std::time::Instant;
 
 use gpui::{
     Action, App, AppContext, Context, Entity, FocusHandle, Focusable, KeyBinding, Subscription,
@@ -15,6 +15,7 @@ use crate::{
     term::{Events, Failed, Launch, Pty},
 };
 
+mod badge;
 mod events;
 mod filter;
 mod layout;

@@ -20,7 +20,7 @@ use super::{
     CONTEXT, CloneSession, ClosePane, CloseSession, CloseTab, FocusPane, LastSession, LastTab,
     NewSession, NewTab, NextSession, NextTab, NextUsed, PreviousSession, PreviousTab, PreviousUsed,
     SelectSession, SelectTab, Side, SplitDown, SplitRight, SwapPane, TogglePanel, ToggleSessions,
-    Workspace, Zen, ZoomPane,
+    Workspace, Zen, ZoomPane, badge,
 };
 use crate::menus;
 use crate::sessions::{self, Session};
@@ -292,6 +292,14 @@ impl Render for Workspace {
         let mut terminal = ShellColumn::new("terminal")
             .title(self.title().to_string())
             .child(self.panes());
+        // STAT-17: which branch the shown session's folder sits in, when it sits in one.
+        let badge = self
+            .session(self.active)
+            .and_then(|session| badge::Branch::of(&session.folder))
+            .map(|branch| Caption::new(SharedString::from(branch.label())));
+        if let Some(badge) = badge {
+            terminal = terminal.action(badge);
+        }
         if self.tabs.is_empty() {
             // A session that would not start says why, in words the user can copy into an issue.
             let report = self.start_failed.as_ref().map(Failed::report);
