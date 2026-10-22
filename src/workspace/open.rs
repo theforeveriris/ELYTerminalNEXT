@@ -9,6 +9,14 @@ use crate::term::shell::{ShellIntegration, launch_found};
 use crate::term::{Launch, Quote, Target, config, opened, spawn};
 
 impl Workspace {
+    /// Asks for the new-tab menu to open at `at`, the plus the user pressed.
+    pub fn ask_add_menu(&mut self, at: gpui::Point<gpui::Pixels>, cx: &mut Context<Self>) {
+        self.add_asked += 1;
+        self.add_menu = Some((self.add_asked, at));
+        log::info!("app: the plus at {at:?} asks for the new-tab menu");
+        cx.notify();
+    }
+
     /// Opens a tab running the shell `found`, in the folder a new session would start in.
     pub fn new_tab_with(
         &mut self,

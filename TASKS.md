@@ -465,9 +465,9 @@ Progress truth. Top to bottom, one at a time. A task is ticked only after its co
 ## 43. A shell of the user's choosing
 ## 43. 自己挑一个 shell
 
-- [x] T85 The shell a session starts is picked, not typed from memory, as SHELL-02 and SHELL-04 ask: the Terminal settings' Shell is a list of every shell the scan found, with its version, chosen writes its path, and the field for a path stays under it for one the scan did not find; the sessions column's plus keeps opening the default session when pressed and its arrow lists every scanned shell and every ssh host, each opening a tab of its own in the folder a new session would start in.
+- [x] T85 The shell a session starts is picked, not typed from memory, as SHELL-02 and SHELL-04 ask: the Terminal settings' Shell is a list of every shell the scan found, with its version, chosen writes its path, and the field for a path stays under it for one the scan did not find; the sessions column's plus, beside its filter, opens a menu of the session the settings would start, then every scanned shell and every ssh host, each opening a tab of its own in the folder a new session would start in.
 
-  - 会话用哪个 shell 是选出来的，不必凭记忆写，这是 SHELL-02 与 SHELL-04 所要求的：终端设置里的 Shell 是扫描到的每个 shell 的列表并带版本，选中即写入其路径，扫描不到的 shell 仍可在下面的路径框里填写；会话栏的「+」正按仍是默认会话，旁边的箭头列出每个扫描到的 shell 与每个 ssh 主机，各自开一个标签，起始目录与新建会话一致。
+  - 会话用哪个 shell 是选出来的，不必凭记忆写，这是 SHELL-02 与 SHELL-04 所要求的：终端设置里的 Shell 是扫描到的每个 shell 的列表并带版本，选中即写入其路径，扫描不到的 shell 仍可在下面的路径框里填写；会话栏筛选框旁的「+」展开一份菜单，先是默认会话，接着每个扫描到的 shell 与每个 ssh 主机，各自开一个标签，起始目录与新建会话一致。
 ## 44. A tab that folds
 ## 44. 会折叠的标签
 

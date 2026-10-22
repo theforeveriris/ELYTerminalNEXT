@@ -23,6 +23,7 @@ mod health;
 mod keys;
 mod layout;
 mod mru;
+mod newtab;
 mod open;
 mod panes;
 mod rename;
@@ -132,6 +133,10 @@ pub struct Workspace {
     pane_drag: Option<panes::Dragging>,
     /// The health check's report while the user has it open.
     pub(crate) health: Option<crate::health::Report>,
+    /// The new-tab menu at its numbered request, opened where the plus was pressed.
+    add_menu: Option<(u64, gpui::Point<gpui::Pixels>)>,
+    /// The number of the last new-tab menu asked for.
+    add_asked: u64,
     _settings: Subscription,
     _acted: Subscription,
 }
@@ -212,6 +217,8 @@ impl Workspace {
             start_failed: failed,
             pane_drag: None,
             health: None,
+            add_menu: None,
+            add_asked: 0,
             _settings: cx.observe_global_in::<SettingsStore>(window, |this, window, cx| {
                 this.background.follow(window, SettingsStore::get(cx));
                 cx.notify();

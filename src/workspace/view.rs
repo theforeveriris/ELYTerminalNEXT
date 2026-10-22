@@ -29,49 +29,7 @@ use crate::sessions::{self, Session};
 use crate::settings::window::OpenSettings;
 use crate::settings::{PanelTab, Settings, SettingsStore, language};
 use crate::term::Failed;
-use crate::workspace::TITLE;
-
-/// The new-tab button: its main press opens the default session, and its arrow lists each shell the scan found and each ssh host.
-fn new_button(workspace: &Entity<Workspace>, cx: &App) -> impl IntoElement + use<> {
-    use ely_gpui_component::menus::{Menu, MenuItem, SplitButton};
-    let mut menu = Menu::new();
-    let adder = workspace.clone();
-    menu = menu.item(
-        MenuItem::new(language::message(cx, "workspace.new_tab"))
-            .on_click(move |window, cx| adder.update(cx, |this, cx| this.new_tab(window, cx))),
-    );
-    let shells = cx.global::<crate::term::shell::Shells>().0.clone();
-    if !shells.is_empty() {
-        menu = menu.separator();
-    }
-    for found in shells {
-        let label = match &found.version {
-            Some(version) => format!("{} ({version})", found.name),
-            None => found.name.clone(),
-        };
-        let adder = workspace.clone();
-        menu = menu.item(MenuItem::new(label).on_click(move |window, cx| {
-            adder.update(cx, |this, cx| this.new_tab_with(&found, window, cx))
-        }));
-    }
-    let hosts = cx.global::<crate::ssh::Hosts>().hosts.clone();
-    if !hosts.is_empty() {
-        menu = menu.separator();
-    }
-    for host in hosts {
-        let name = host.name.clone();
-        let adder = workspace.clone();
-        menu = menu.item(
-            MenuItem::new(host.name.clone()).on_click(move |window, cx| {
-                adder.update(cx, |this, cx| this.connect(name.clone(), window, cx))
-            }),
-        );
-    }
-    let adder = workspace.clone();
-    SplitButton::new("new-tab", "+", menu)
-        .variant(ButtonVariant::Ghost)
-        .on_click(move |_, window, cx| adder.update(cx, |this, cx| this.new_tab(window, cx)))
-}
+use crate::workspace::{TITLE, newtab};
 
 impl Workspace {
     /// The sessions column: a row for each tab, and under the shown one a row for each of its panes.
@@ -186,7 +144,26 @@ impl Workspace {
                 div()
                     .px_2()
                     .pt_2()
-                    .child(Input::new(&self.filter.field).size(ControlSize::Sm)),
+                    .flex()
+                    .items_center()
+                    .gap_2()
+                    .child(newtab::button(workspace, self.add_menu, cx))
+                    .child({
+                        let splitter = workspace.clone();
+                        IconButton::new("split-pane", IconName::PanelRight)
+                            .variant(ButtonVariant::Ghost)
+                            .size(ControlSize::Sm)
+                            .tooltip(language::message(cx, "workspace.split"))
+                            .on_click(move |_, window, cx| {
+                                splitter.update(cx, |this, cx| this.split(true, window, cx))
+                            })
+                    })
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .child(Input::new(&self.filter.field).size(ControlSize::Sm)),
+                    ),
             )
             .child(
                 div()
@@ -344,20 +321,10 @@ impl Render for Workspace {
             }
         }
         if show_sessions {
-            let new = new_button(&workspace, cx);
-            let splitter = workspace.clone();
-            let split = IconButton::new("split-pane", IconName::PanelRight)
-                .variant(ButtonVariant::Ghost)
-                .size(ControlSize::Sm)
-                .tooltip(language::message(cx, "workspace.split"))
-                .on_click(move |_, window, cx| {
-                    splitter.update(cx, |this, cx| this.split(true, window, cx))
-                });
             let column = self.tabs_column(&workspace, cx);
             shell = shell.column(
                 self.side_column(Side::Sessions, cx)
                     .leading(left)
-                    .action(div().flex().items_center().gap_1().child(new).child(split))
                     .child(column),
             );
         } else {
