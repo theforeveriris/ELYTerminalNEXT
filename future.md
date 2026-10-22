@@ -118,6 +118,10 @@
 - **TAB-30（部分）**：会话栏顶部可按名称或目录筛选；匹配的标签保留，未匹配的标签与窗格行隐藏。
 - **TAB-12（部分）**：关闭仍有前台命令的会话或标签时会先确认（Unix 用前台进程组判断；Windows 暂不拦截）；Terminal 设置里可关闭该确认。
 - **SEL-07 / INP-09（部分）**：粘贴含 ESC 等控制字符或超过 4000 字符时，先在窗格左上角显示预览、行数与 Paste/Cancel，确认后才以括号粘贴发送；换行统一转成 CR，避免多行直接执行。
+- **SEC-05**：OSC 0 / 2 的标题在写进窗口前去掉 C0 / C1 控制符、方向控制符与不可见格式符，换行变空格，超过 1024 字符的截断；程序无法用转义序列结束标题再自己设定颜色。见 `src/term/titles.rs`。
+- **SEC-04**：OSC 8 目标与行内识别出的 URL 只在 http / https / mailto / file 下可点；`javascript:`、`data:` 与不认识的 scheme 一律不打开。见 `src/term/links.rs`。
+- **PROTO-01 / 02 / 03**：DA1 按真实能力回答 `62;22`（VT220 + ANSI 颜色），不报 sixel 的 4 与 ReGIS 的 3；XTVERSION 由 tap 读取（vte 不派发它）并回答 `ELYTerminal(版本)`；DECRQM 按网格模式与鼠标模式回答，已知但不设置的答 4，不认识的答 0。见 `src/term/device.rs`。
+- **SHELL-13**：启动失败时保留程序与参数、目录、错误及其成因，以及程序自己写下的前 8 行；窗口里显示这份报告并带一个复制按钮，日志里也记一份。见 `src/term/pty.rs` 的 `Failed` 与 `src/workspace.rs`。
 
 ---
 

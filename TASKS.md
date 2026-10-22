@@ -364,3 +364,22 @@ Progress truth. Top to bottom, one at a time. A task is ticked only after its co
 - [x] T64 Release v0.1.7 with T59 to T63, T65 and T66: version 0.1.7; the macOS disk image, the Windows zip and the Linux tarball, each from its script; the notes list what changed in English and Chinese.
 
   - 发布 v0.1.7，含 T59 至 T63、T65 与 T66：版本 0.1.7；macOS 磁盘映像、Windows zip 与 Linux tarball，各自由各自的脚本构建；发布说明以英文与中文列出变更内容。
+
+## 34. Safe defaults and honest answers
+## 34. 安全的默认值与诚实的回答
+
+- [x] T67 A title a program writes keeps no control that could disguise it, as future.md's SEC-05 asks: OSC 0 and OSC 2 lose their C0 and C1 controls, their direction controls and their invisible formatting on the way to the window, a newline becomes a space, and a title past 1024 characters is cut.
+
+  - 程序写下的标题不带任何可能伪装它的控制符，这是 future.md 的 SEC-05 所要求的：OSC 0 与 OSC 2 在写进窗口前去掉 C0 与 C1 控制符、方向控制符与不可见格式符，换行变成空格，超过 1024 字符的标题被截断。
+
+- [x] T68 A link opens only what the user may open, as SEC-04 asks: an OSC 8 target and a URL found in a line open under http, https, mailto or file alone; `javascript:`, `data:` and a scheme the terminal knows nothing of stay dead.
+
+  - 链接只打开用户可以打开的东西，这是 SEC-04 所要求的：OSC 8 的目标与行内识别出的 URL 只在 http、https、mailto 与 file 下打开；`javascript:`、`data:` 以及终端不认识的 scheme 一律不打开。
+
+- [x] T69 The terminal says what it is, and no more than it is, as PROTO-01, PROTO-02 and PROTO-03 ask: DA1 answers 62;22 and leaves sixel's 4 and ReGIS's 3 out, so no program tries to send graphics the terminal cannot draw; XTVERSION, which the parser hands to no handler, is read by the tap and answered ELYTerminal with its version; DECRQM answers from the grid's modes and the mouse's, 4 for a mode the terminal knows but never sets and 0 for one it knows nothing of.
+
+  - 终端说自己是什么，不多说一分，这是 PROTO-01、PROTO-02 与 PROTO-03 所要求的：DA1 回答 62;22，不报 sixel 的 4 与 ReGIS 的 3，于是没有程序会去发送终端画不出的图形；XTVERSION 由 tap 读取（解析器不派发它）并回答 ELYTerminal 及其版本；DECRQM 按网格模式与鼠标模式回答，已知但从不设置的答 4，不认识的答 0。
+
+- [x] T70 A session that will not start says why, and what to copy, as SHELL-13 asks: a failed start keeps the program and its arguments, the folder, the error with its causes, and the first eight lines the program wrote itself, and shows them in the window with a Copy button; the words go to the log too.
+
+  - 无法启动的会话会说明原因，并给出可复制的内容，这是 SHELL-13 所要求的：启动失败时保留程序与参数、目录、错误及其成因，以及程序自己写下的前八行，在窗口中显示并带一个复制按钮；这些文字也记入日志。
