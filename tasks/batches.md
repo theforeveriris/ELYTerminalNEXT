@@ -36,8 +36,23 @@ Each feature: one commit. Each group: one push after `cargo test`, `cargo clippy
 
 17. future.md §8 第 20 条：`Ctrl-Shift-Alt-H` 报告设置、集成脚本与每台 shell 的状况，叠在终端上并可复制。
 
+## Group 6 — 窗格与标签的人体工学 (2 commits, pushed)
+
+18. TAB-15：窗格宽度与行高改成权重，布局按份额伸缩；行内与行间的边界可拖动，双击或 `Ctrl-Shift-Alt-E` 重新均分，最小 5%。
+19. TAB-03 / TAB-04：`Ctrl-Shift-Alt-PageUp/PageDown` 移动标签，`Ctrl-Shift-Alt-P` 固定，固定的排在前面并显示 `★`。
+
+## Group 7 — 安全与导航 (1 commit, pushed)
+
+20. SEL-08 / SEC-03 / PROTO-16：OSC 52 写入超过 100 KiB 拒绝并记日志。
+21. STAT-19 / FIND-08：会话悬停列出失败过的命令；`Ctrl-Shift-Alt-↑/↓` 跳到上一条/下一条失败命令。
+22. INP-14（部分）：快捷键表补全可搜索，`Ctrl-Shift-/` 打开。
+
+## Group 8 — 窗口标题 (1 commit, pushed)
+
+23. UI-17：标题模板 `{title}` / `{cwd}` / `{shell}`，设置里有输入框，种子配置里有说明。
+
 ## 未做（留给下一轮）
 
-`PERF-01/02/10`（行级 damage、shaping 缓存、性能面板）需要改渲染核心，`TAB-15`（拖动分屏比例）
-需要改布局与命中测试，`CFG-09`（键位自定义）需要一张 action 表与录制 UI。这三块风险最大，
-应各自单独一轮，配人工验收。
+`PERF-01/02/10`（行级 damage、shaping 缓存、性能面板）需要改渲染核心，`CFG-09`（键位自定义）
+需要一张 action 表与录制 UI，`TAB-22`（多窗口）与 `TAB-23`（快速终端）需要平台窗口 API。
+这几块风险最大，应各自单独一轮，配人工验收。
