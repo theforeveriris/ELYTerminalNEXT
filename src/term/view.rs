@@ -400,7 +400,22 @@ impl TerminalView {
                 let honest = device::honest(&text, self.term_mode(), mouse);
                 self.pty.write(honest.unwrap_or(text).into_bytes());
             }
-            Event::ChildExit(status) => cx.emit(TerminalEvent::Exited(status)),
+            Event::ChildExit(status) => {
+                // A program that ends at once leaves its own words on the grid; a failed start keeps them.
+                if !status.success() && self.reports == 0 {
+                    let text = self
+                        .pty
+                        .term
+                        .lock()
+                        .selection_to_string()
+                        .unwrap_or_default();
+                    let lines = super::pty::said(&text);
+                    if !lines.is_empty() {
+                        log::info!("terminal {}: it ended saying {lines:?}", self.pty.pid);
+                    }
+                }
+                cx.emit(TerminalEvent::Exited(status))
+            }
             Event::Exit => log::debug!("terminal {}: the grid closed", self.pty.pid),
         }
     }

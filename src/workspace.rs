@@ -13,9 +13,8 @@ use crate::{
     sessions::orb,
     settings::SettingsStore,
     term::{
-        Events, Launch, Pty, config,
+        Events, Failed, Launch, Pty, config, failed, opened,
         shell::{ShellIntegration, launch},
-        spawn,
     },
 };
 
@@ -204,6 +203,8 @@ pub struct Workspace {
     mru: mru::Mru,
     /// The field that filters the sessions column.
     filter: filter::Filter,
+    /// Why the session this window opened with could not start, while it keeps none.
+    pub(crate) start_failed: Option<Failed>,
     _settings: Subscription,
     _acted: Subscription,
 }
@@ -247,6 +248,7 @@ impl Workspace {
             saving: None,
             mru: mru::Mru::default(),
             filter: filter::Filter::new(window, cx),
+            start_failed: None,
             _settings: cx.observe_global_in::<SettingsStore>(window, |this, window, cx| {
                 this.background.follow(window, SettingsStore::get(cx));
                 cx.notify();
@@ -267,6 +269,47 @@ impl Workspace {
             workspace.restore(saved, window, cx);
         }
         workspace
+    }
+
+    /// The window's content with no session: the one it opened with could not start, and says why.
+    pub fn failed(
+        launch: Launch,
+        failed: Failed,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        let git = cx.new(|cx| GitPanel::new(launch.cwd.clone(), window, cx));
+        let acted = cx.subscribe(&git, |this, _, _: &Acted, cx| {
+            let folder = this
+                .session(this.active)
+                .map(|session| session.folder.clone())
+                .unwrap_or_default();
+            this.files.update(cx, |files, cx| files.show(&folder, cx));
+        });
+        Self {
+            focus: cx.focus_handle(),
+            sessions: Vec::new(),
+            tabs: Vec::new(),
+            active_tab: 0,
+            active: 0,
+            files: cx.new(|_| Files::new(launch.cwd.clone())),
+            git,
+            background: Blur::new(window, SettingsStore::get(cx)),
+            dragged: Dragged::default(),
+            ticking: None,
+            next_id: 1,
+            zoom: None,
+            zen: false,
+            saving: None,
+            mru: mru::Mru::default(),
+            filter: filter::Filter::new(window, cx),
+            start_failed: Some(failed),
+            _settings: cx.observe_global_in::<SettingsStore>(window, |this, window, cx| {
+                this.background.follow(window, SettingsStore::get(cx));
+                cx.notify();
+            }),
+            _acted: acted,
+        }
     }
 
     /// The session with the id, if it is still here.
@@ -324,18 +367,24 @@ impl Workspace {
                 log::debug!("app: the last folder stays: {error:#}");
             }
         }
-        let started = launch(&settings.shell, folder, &cx.global::<ShellIntegration>().0).and_then(
-            |launch| {
-                Ok((
-                    spawn(&launch, (80, 24), (8, 16), config(&settings))?,
-                    launch,
-                ))
+        let home_folder = folder.clone();
+        let launched = launch(&settings.shell, folder, &cx.global::<ShellIntegration>().0);
+        let started = match launched {
+            Ok(launch) => match opened(&launch, (80, 24), (8, 16), config(&settings)) {
+                Ok((pty, events)) => Ok(((pty, events), launch)),
+                Err(failed) => Err(failed),
             },
-        );
+            Err(error) => Err(failed(None, home_folder, &error, Vec::new())),
+        };
         match started {
-            Ok(((pty, events), launch)) => Some(self.add(pty, events, launch, window, cx)),
-            Err(error) => {
-                log::error!("app: no new session: {error:#}");
+            Ok(((pty, events), launch)) => {
+                self.start_failed = None;
+                Some(self.add(pty, events, launch, window, cx))
+            }
+            Err(failed) => {
+                log::error!("app: no new session:\n{}", failed.report());
+                self.start_failed = Some(failed);
+                cx.notify();
                 None
             }
         }

@@ -13,7 +13,7 @@ use crate::{
     blur, menus,
     settings::{self, SettingsStore},
     ssh,
-    term::{ICONS, Launch, MONO, config, input, shell::ShellIntegration, spawn},
+    term::{ICONS, Launch, MONO, config, input, opened, shell::ShellIntegration},
     themes, updates,
     workspace::{self, TITLE, Workspace},
 };
@@ -157,7 +157,8 @@ pub fn open(launch: Launch, cx: &mut App) -> anyhow::Result<WindowHandle<Workspa
         window_background: background,
         ..Default::default()
     };
-    let (pty, events) = spawn(&launch, (80, 24), (8, 16), config(SettingsStore::get(cx)))?;
+    let started = opened(&launch, (80, 24), (8, 16), config(SettingsStore::get(cx)));
+    let launch = launch.clone();
     let window = cx.open_window(options, |window, cx| {
         window.set_app_id(APP_ID);
         window
@@ -165,7 +166,14 @@ pub fn open(launch: Launch, cx: &mut App) -> anyhow::Result<WindowHandle<Workspa
             .detach();
         cx.new(|cx| {
             keep_size(window, cx);
-            Workspace::new(pty, events, launch, window, cx)
+            match started {
+                Ok((pty, events)) => Workspace::new(pty, events, launch, window, cx),
+                // A session that will not start still opens a window: it says why, and what to copy.
+                Err(failed) => {
+                    log::error!("app: no session:\n{}", failed.report());
+                    Workspace::failed(launch, failed, window, cx)
+                }
+            }
         })
     })?;
     crate::pet::follow(window, cx);

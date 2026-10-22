@@ -156,6 +156,8 @@ const EN: &[(&str, &str)] = &[
     ("workspace.filter", "Filter sessions"),
     ("workspace.close_session", "Close session"),
     ("workspace.no_folder", "This shell reports no folder."),
+    ("workspace.no_session", "No session could start."),
+    ("workspace.copy", "Copy"),
     ("workspace.git", "Git"),
     ("workspace.files", "Files"),
 ];
@@ -244,6 +246,8 @@ const ZH: &[(&str, &str)] = &[
     ("workspace.filter", "筛选会话"),
     ("workspace.close_session", "关闭会话"),
     ("workspace.no_folder", "此 shell 未报告目录。"),
+    ("workspace.no_session", "没有会话能启动。"),
+    ("workspace.copy", "复制"),
     ("workspace.git", "Git"),
     ("workspace.files", "文件"),
 ];

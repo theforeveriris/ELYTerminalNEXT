@@ -96,6 +96,80 @@ type Raw = super::unix::Pty;
 #[cfg(windows)]
 type Raw = tty::Pty;
 
+/// The lines of a program's own output a failed start keeps, enough to say what went wrong.
+pub const STDERR: usize = 8;
+
+/// Why a session could not start: what was tried, in what folder, and what the program said.
+///
+/// A start that fails used to say nothing a user could act on. This is what they see, and what they
+/// can copy into an issue: the program and its arguments, the folder, the error, and the first lines
+/// the program wrote itself, which is where a shell says why it will not run.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Failed {
+    /// The program and its arguments, as the settings or the scan named them.
+    pub program: Option<(String, Vec<String>)>,
+    /// The folder the session was to start in.
+    pub cwd: PathBuf,
+    /// What the system said; the error's own words, with its causes.
+    pub error: String,
+    /// The first lines the program wrote before it ended.
+    pub said: Vec<String>,
+}
+
+impl Failed {
+    /// What the user sees, and can copy: every part on its own line.
+    pub fn report(&self) -> String {
+        let mut lines = Vec::new();
+        match &self.program {
+            Some((program, args)) if args.is_empty() => lines.push(format!("Program: {program}")),
+            Some((program, args)) => lines.push(format!("Program: {program} {}", args.join(" "))),
+            None => lines.push("Program: the login shell".into()),
+        }
+        if self.cwd.as_os_str().is_empty() {
+            lines.push("Folder: none given".into());
+        } else {
+            lines.push(format!("Folder: {}", self.cwd.display()));
+        }
+        lines.push(format!("Error: {}", self.error));
+        for line in &self.said {
+            lines.push(line.clone());
+        }
+        lines.join("\n")
+    }
+}
+
+/// `error` as a failed start in `cwd` of `program`, with the first lines `said` of its own output.
+pub fn failed(
+    program: Option<&(String, Vec<String>)>,
+    cwd: PathBuf,
+    error: &anyhow::Error,
+    said: Vec<String>,
+) -> Failed {
+    Failed {
+        program: program.cloned(),
+        cwd,
+        error: format!("{error:#}"),
+        said: said.into_iter().take(STDERR).collect(),
+    }
+}
+/// The first `STDERR` lines of `text` that say something, each without its controls and trimmed.
+///
+/// A program that will not start writes why to the terminal it was given; those are the lines worth
+/// keeping. Controls and empty lines go, so the report reads as the user would read it.
+pub fn said(text: &str) -> Vec<String> {
+    text.lines()
+        .map(|line| {
+            line.chars()
+                .filter(|&c| !c.is_control() || c == '\t')
+                .collect::<String>()
+                .trim()
+                .to_owned()
+        })
+        .filter(|line| !line.is_empty())
+        .take(STDERR)
+        .collect()
+}
+
 /// The grid's options from the settings: scrollback, the cursor programs start from, kitty keys.
 pub fn config(settings: &Settings) -> Config {
     let shape = match settings.cursor_style {
@@ -177,6 +251,22 @@ pub fn spawn(
         events,
     ))
 }
+
+/// Starts `launch` as [`spawn`] does; on failure, why, in words the user can copy.
+pub fn opened(launch: &Launch, size: (usize, usize), cell: (u16, u16), config: Config) -> Started {
+    match spawn(launch, size, cell, config) {
+        Ok(started) => Ok(started),
+        Err(error) => Err(failed(
+            launch.program.as_ref(),
+            launch.cwd.clone(),
+            &error,
+            Vec::new(),
+        )),
+    }
+}
+
+/// A session's start: its pty and events, or why no session could start.
+pub type Started = Result<(Pty, Events), Failed>;
 
 #[cfg(unix)]
 fn start(launch: &Launch, env: HashMap<String, String>, size: WindowSize) -> std::io::Result<Raw> {
@@ -276,6 +366,52 @@ pub fn fit(columns: usize, lines: usize, cell: (u16, u16)) -> WindowSize {
 
 #[cfg(all(test, unix))]
 mod tests;
+
+#[cfg(test)]
+mod failed_tests {
+    use super::*;
+
+    #[test]
+    fn a_failed_start_says_what_it_tried_and_where() {
+        let program = Some(("/bin/sh".to_string(), vec!["-l".to_string()]));
+        let failed = failed(
+            program.as_ref(),
+            PathBuf::from("/home/u/src"),
+            &anyhow::anyhow!("no such file"),
+            Vec::new(),
+        );
+        assert_eq!(
+            failed.report(),
+            "Program: /bin/sh -l\nFolder: /home/u/src\nError: no such file"
+        );
+        let login = super::failed(None, PathBuf::new(), &anyhow::anyhow!("no shell"), vec![]);
+        assert_eq!(
+            login.report(),
+            "Program: the login shell\nFolder: none given\nError: no shell"
+        );
+    }
+
+    #[test]
+    fn the_lines_a_program_wrote_come_with_the_report() {
+        let lines = said("sh: \u{1b}[31mno such shell\u{1b}[0m\r\n\r\n  1. try again\n");
+        assert_eq!(lines, ["sh: [31mno such shell[0m", "1. try again"]);
+        let program = ("sh".to_string(), Vec::<String>::new());
+        let failed = failed(
+            Some(&program),
+            PathBuf::from("/tmp"),
+            &anyhow::anyhow!("it ended at once"),
+            lines,
+        );
+        assert!(
+            failed.report().ends_with("1. try again"),
+            "{}",
+            failed.report()
+        );
+        assert!(said("\r\n\n").is_empty(), "nothing said");
+        let long: String = (1..=40).map(|at| format!("{at}\n")).collect();
+        assert_eq!(said(&long).len(), STDERR, "the first {STDERR} lines");
+    }
+}
 
 #[cfg(test)]
 mod scrollback {

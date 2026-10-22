@@ -3,7 +3,7 @@
 use std::time::Instant;
 
 use ely_gpui_component::{
-    buttons::{ButtonVariant, IconButton, SegmentedControl},
+    buttons::{Button, ButtonVariant, IconButton, SegmentedControl},
     forms::Input,
     lists::{List, ListItem},
     primitives::{FocusScope, IconName},
@@ -12,8 +12,8 @@ use ely_gpui_component::{
     typography::Caption,
 };
 use gpui::{
-    AnyElement, App, Context, Entity, IntoElement, Render, SharedString, StyleRefinement, Styled,
-    Window, div, prelude::*, px,
+    AnyElement, App, ClipboardItem, Context, Entity, IntoElement, Render, SharedString,
+    StyleRefinement, Styled, Window, div, prelude::*, px,
 };
 
 use super::{
@@ -26,6 +26,7 @@ use crate::menus;
 use crate::sessions::{self, Session};
 use crate::settings::window::OpenSettings;
 use crate::settings::{PanelTab, Settings, SettingsStore, language};
+use crate::term::Failed;
 use crate::workspace::TITLE;
 
 /// Shows Git or Files in the right column, as the settings keep it.
@@ -291,6 +292,33 @@ impl Render for Workspace {
         let mut terminal = ShellColumn::new("terminal")
             .title(self.title().to_string())
             .child(self.panes());
+        if self.tabs.is_empty() {
+            // A session that would not start says why, in words the user can copy into an issue.
+            let report = self.start_failed.as_ref().map(Failed::report);
+            if let Some(report) = report {
+                let copied = report.clone();
+                terminal = ShellColumn::new("terminal")
+                    .title(self.title().to_string())
+                    .child(
+                        div()
+                            .size_full()
+                            .flex()
+                            .flex_col()
+                            .gap_3()
+                            .p_6()
+                            .child(Caption::new(SharedString::from(report.clone())))
+                            .child(
+                                Button::new(
+                                    "copy-failure",
+                                    language::message(cx, "workspace.copy"),
+                                )
+                                .on_click(move |_, _, cx| {
+                                    cx.write_to_clipboard(ClipboardItem::new_string(copied.clone()))
+                                }),
+                            ),
+                    );
+            }
+        }
         if show_sessions {
             let adder = workspace.clone();
             let new = IconButton::new("new-tab", IconName::Plus)
