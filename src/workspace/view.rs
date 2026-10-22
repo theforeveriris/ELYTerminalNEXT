@@ -31,6 +31,48 @@ use crate::settings::{PanelTab, Settings, SettingsStore, language};
 use crate::term::Failed;
 use crate::workspace::TITLE;
 
+/// The new-tab button: its main press opens the default session, and its arrow lists each shell the scan found and each ssh host.
+fn new_button(workspace: &Entity<Workspace>, cx: &App) -> impl IntoElement + use<> {
+    use ely_gpui_component::menus::{Menu, MenuItem, SplitButton};
+    let mut menu = Menu::new();
+    let adder = workspace.clone();
+    menu = menu.item(
+        MenuItem::new(language::message(cx, "workspace.new_tab"))
+            .on_click(move |window, cx| adder.update(cx, |this, cx| this.new_tab(window, cx))),
+    );
+    let shells = cx.global::<crate::term::shell::Shells>().0.clone();
+    if !shells.is_empty() {
+        menu = menu.separator();
+    }
+    for found in shells {
+        let label = match &found.version {
+            Some(version) => format!("{} ({version})", found.name),
+            None => found.name.clone(),
+        };
+        let adder = workspace.clone();
+        menu = menu.item(MenuItem::new(label).on_click(move |window, cx| {
+            adder.update(cx, |this, cx| this.new_tab_with(&found, window, cx))
+        }));
+    }
+    let hosts = cx.global::<crate::ssh::Hosts>().hosts.clone();
+    if !hosts.is_empty() {
+        menu = menu.separator();
+    }
+    for host in hosts {
+        let name = host.name.clone();
+        let adder = workspace.clone();
+        menu = menu.item(
+            MenuItem::new(host.name.clone()).on_click(move |window, cx| {
+                adder.update(cx, |this, cx| this.connect(name.clone(), window, cx))
+            }),
+        );
+    }
+    let adder = workspace.clone();
+    SplitButton::new("new-tab", "+", menu)
+        .variant(ButtonVariant::Ghost)
+        .on_click(move |_, window, cx| adder.update(cx, |this, cx| this.new_tab(window, cx)))
+}
+
 impl Workspace {
     /// The sessions column: a row for each tab, and under the shown one a row for each of its panes.
     fn tabs_column(&self, workspace: &Entity<Workspace>, cx: &App) -> impl IntoElement {
@@ -300,14 +342,7 @@ impl Render for Workspace {
             }
         }
         if show_sessions {
-            let adder = workspace.clone();
-            let new = IconButton::new("new-tab", IconName::Plus)
-                .variant(ButtonVariant::Ghost)
-                .size(ControlSize::Sm)
-                .tooltip(language::message(cx, "workspace.new_tab"))
-                .on_click(move |_, window, cx| {
-                    adder.update(cx, |this, cx| this.new_tab(window, cx))
-                });
+            let new = new_button(&workspace, cx);
             let splitter = workspace.clone();
             let split = IconButton::new("split-pane", IconName::PanelRight)
                 .variant(ButtonVariant::Ghost)

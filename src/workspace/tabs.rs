@@ -6,7 +6,7 @@ use super::layout::{Direction, SessionId, Tab};
 use super::{TITLE, Workspace};
 use crate::sessions::Session;
 use crate::settings::{Settings, SettingsStore};
-use crate::term::shell::{ShellIntegration, launch};
+use crate::term::shell::{ShellIntegration, launch, launch_found};
 use crate::term::{
     Events, Launch, Pty, Quote, Target, TerminalView, config, opened, pty::failed as failure, spawn,
 };
@@ -127,6 +127,43 @@ impl Workspace {
         self.active_tab = self.tabs.len() - 1;
         self.select(id, window, cx);
         log::info!("app: tab {} opens", self.active_tab + 1);
+    }
+
+    /// Opens a tab running the shell `found`, in the folder a new session would start in.
+    pub fn new_tab_with(
+        &mut self,
+        found: &crate::term::shell::scan::Found,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(home) = dirs::home_dir() else {
+            log::error!("app: no home folder, so no {} session", found.name);
+            return;
+        };
+        let settings = SettingsStore::get(cx).clone();
+        let session = self
+            .session(self.active)
+            .map(|session| session.folder.as_path());
+        let folder = settings.start_folder(&home, session);
+        let launch = match launch_found(found, folder, &cx.global::<ShellIntegration>().0) {
+            Ok(launch) => launch,
+            Err(error) => {
+                log::error!("app: no {} session: {error:#}", found.name);
+                return;
+            }
+        };
+        let (pty, events) = match opened(&launch, (80, 24), (8, 16), config(&settings)) {
+            Ok(started) => started,
+            Err(failed) => {
+                log::error!("app: no {} session:\n{}", found.name, failed.report());
+                return;
+            }
+        };
+        let id = self.add(pty, events, launch, window, cx);
+        self.tabs.push(Tab::new(id));
+        self.active_tab = self.tabs.len() - 1;
+        self.select(id, window, cx);
+        log::info!("app: tab {} opens as {}", self.active_tab + 1, found.name);
     }
 
     /// Opens a tab on `host`, running the ssh the system has.
