@@ -83,11 +83,12 @@ fn a_notification_says_its_text_as_text() {
 }
 
 #[test]
-fn a_session_posts_unless_it_is_the_one_shown_in_an_active_window() {
-    assert!(!unseen(true, true));
-    assert!(unseen(true, false), "the window inactive");
-    assert!(unseen(false, true), "the session hidden");
-    assert!(unseen(false, false));
+fn a_session_posts_unless_it_is_shown_in_an_active_window_or_the_window_is_quiet() {
+    assert!(!unseen(true, true, false));
+    assert!(unseen(true, false, false), "the window inactive");
+    assert!(unseen(false, true, false), "the session hidden");
+    assert!(unseen(false, false, false));
+    assert!(!unseen(false, false, true), "do not disturb");
 }
 
 #[test]

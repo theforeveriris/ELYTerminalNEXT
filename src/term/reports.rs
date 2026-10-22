@@ -9,6 +9,7 @@ use super::{
 };
 use crate::{
     sessions::{line, plain},
+    settings::SettingsStore,
     workspace::TITLE,
 };
 
@@ -170,8 +171,9 @@ impl TerminalView {
     /// Posts `body` while the window is not active or the session hidden, one every 3 seconds at most.
     pub(super) fn post(&mut self, body: String, asked: Option<&Notice>, cx: &mut Context<Self>) {
         let pid = self.pty.pid;
-        if !unseen(self.front, self.active) {
-            log::debug!("terminal {pid}: in view, so it posts no {body:?}");
+        let quiet = SettingsStore::get(cx).do_not_disturb;
+        if !unseen(self.front, self.active, quiet) {
+            log::debug!("terminal {pid}: in view or quiet, so it posts no {body:?}");
             return;
         }
         let Some(posted) = self.notices.turn(pid, asked, Instant::now()) else {
@@ -276,9 +278,9 @@ impl TerminalView {
     }
 }
 
-/// Whether a session posts: not while it is the session shown in an active window.
-fn unseen(front: bool, active: bool) -> bool {
-    !(front && active)
+/// Whether a session posts: not while it is the session shown in an active window, and not while quiet.
+fn unseen(front: bool, active: bool, quiet: bool) -> bool {
+    !quiet && (!front || !active)
 }
 
 /// Whether the row's turn to `state` posts: waiting, done and error do.

@@ -215,11 +215,18 @@ impl SettingsWindow {
             settings.reduce_motion,
             |settings, on| settings.reduce_motion = on,
         );
+        let quiet = switch(
+            this,
+            "do_not_disturb",
+            settings.do_not_disturb,
+            |settings, on| settings.do_not_disturb = on,
+        );
         let ely = switch(this, "ely", settings.ely, |settings, on| settings.ely = on);
         let section = section
             .row(SettingsRow::new(language::message(cx, "settings.terminal.copy")).control(copy))
             .row(SettingsRow::new(language::message(cx, "settings.terminal.bell")).control(bell))
             .row(SettingsRow::new(language::message(cx, "settings.terminal.still")).control(still))
+            .row(SettingsRow::new(language::message(cx, "settings.terminal.quiet")).control(quiet))
             .row(
                 SettingsRow::new(language::message(cx, "settings.terminal.restore"))
                     .control(restore),
