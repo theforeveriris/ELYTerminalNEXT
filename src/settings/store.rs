@@ -141,18 +141,26 @@ pub fn load(path: &Path) -> anyhow::Result<Settings> {
     settings
         .validate()
         .with_context(|| format!("settings: {} holds a bad value", path.display()))?;
+    for key in settings.extra.keys() {
+        log::warn!(
+            "settings: {} names an unknown field {key:?}; it is kept until the next save",
+            path.display()
+        );
+    }
     log::info!("settings: loaded {}", path.display());
     Ok(settings)
 }
 
 /// Writes a temp file beside `path`, then renames it over `path`.
 pub fn save(path: &Path, settings: &Settings) -> anyhow::Result<()> {
+    let mut settings = settings.clone();
+    settings.extra.clear();
     let folder = path
         .parent()
         .with_context(|| format!("settings: {} has no folder", path.display()))?;
     fs::create_dir_all(folder)
         .with_context(|| format!("settings: cannot create {}", folder.display()))?;
-    let mut text = serde_json::to_string_pretty(settings).context("settings: cannot encode")?;
+    let mut text = serde_json::to_string_pretty(&settings).context("settings: cannot encode")?;
     text.push('\n');
     let count = SAVES.fetch_add(1, Ordering::Relaxed);
     let temp = path.with_extension(format!("json.{}-{count}.tmp", std::process::id()));
@@ -221,6 +229,26 @@ mod tests {
             .set_modified(when)
             .expect("a stamp");
         assert_eq!(stamp(&path), Some(when));
+        fs::remove_dir_all(folder).expect("cleanup");
+    }
+
+    #[test]
+    fn an_unknown_field_is_read_warned_and_dropped_on_the_next_save() {
+        let folder = folder("unknown");
+        let path = folder.join("settings.json");
+        fs::create_dir_all(&folder).expect("a folder");
+        fs::write(
+            &path,
+            r##"{"font_size":14.0,"future_flag":true,"custom_colors":{"background":"#000000"}}"##,
+        )
+        .expect("a file");
+        let settings = load(&path).expect("loads");
+        assert_eq!(settings.font_size, 14.0);
+        assert!(settings.extra.contains_key("future_flag"));
+        save(&path, &settings).expect("saves");
+        let text = fs::read_to_string(&path).expect("the file");
+        assert!(!text.contains("future_flag"), "{text}");
+        assert!(load(&path).expect("loads").extra.is_empty());
         fs::remove_dir_all(folder).expect("cleanup");
     }
 
@@ -299,7 +327,6 @@ mod tests {
         named(r#"{ "cursor_style": "beam" }"#, "`cursor_style`");
         named(r#"{ "scrollback": -1 }"#, "`scrollback`");
         named(r#"{ "font_size": "large" }"#, "`font_size`");
-        named(r#"{ "font_sise": 12 }"#, "font_sise");
         named(r#"{ "font_size": 12 } x"#, "trailing characters");
         fs::remove_dir_all(folder).expect("cleanup");
     }

@@ -3,6 +3,7 @@ mod store;
 pub mod window;
 
 use std::{
+    collections::HashMap,
     env,
     ffi::OsStr,
     ops::RangeInclusive,
@@ -62,7 +63,7 @@ pub enum PanelTab {
 
 /// Everything the settings window edits. A field the file leaves out takes its default.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(default, deny_unknown_fields)]
+#[serde(default)]
 pub struct Settings {
     /// A program path; empty runs the login shell.
     pub shell: String,
@@ -117,6 +118,9 @@ pub struct Settings {
     pub language: Language,
     /// The colors of the theme of the user's own.
     pub custom_colors: themes::Colors,
+    /// Fields a later version wrote; kept in memory, warned about, and dropped on the next save.
+    #[serde(flatten)]
+    pub extra: HashMap<String, serde_json::Value>,
 }
 
 impl Default for Settings {
@@ -159,6 +163,7 @@ impl Default for Settings {
             window_y: None,
             language: Language::default(),
             custom_colors: themes::Colors::default(),
+            extra: HashMap::new(),
         }
     }
 }
