@@ -1,44 +1,43 @@
-# Batches from future.md (P0 + a part of P1)
+# Batches from future.md
 
-Each feature: one commit. Each group: one push. Tests run before each commit,
-`scripts/check.sh` before each push. Docs (`future.md` §1.4, `TASKS.md`) at each group's end.
+Each feature: one commit. Each group: one push after `cargo test`, `cargo clippy -D warnings`,
+`cargo fmt --check`, the 500-line rule and the one-line-comment rule. Docs (`future.md` §1.4 and
+`TASKS.md`) at each group's end.
 
-## Group 1 — 安全默认值与能力协商 (5)
+## Group 1 — 安全默认值与能力协商 (5 commits, pushed)
 
-1. SEC-05 标题清洗：OSC 0/2 去 C0/C1 与 BiDi 控制符，限长。
-2. SEC-04 链接白名单：只有 http/https/mailto 可点。
-3. PROTO-01 DA1：按真实能力回答 `CSI c`，不报 VT102。
-4. PROTO-02 XTVERSION：`CSI > 0 q` → `DCS > | ELYTerminal(0.1.7) ST`。
-5. PROTO-03 DECRQM：`CSI ? Ps $ p` 按真实模式表回答，未知答 0。
+1. SEC-05 标题清洗：OSC 0/2 去 C0/C1 与 BiDi 控制符，限长 1024。
+2. SEC-04 链接白名单：只有 http/https/mailto/file 可点。
+3. PROTO-01 / 02 / 03：DA1 答 `62;22`，XTVERSION 答 `ELYTerminal(版本)`，DECRQM 按真实模式表回答。
+4. SHELL-13：启动失败保留程序、目录、错误与前 8 行程序输出，窗口里可复制。
 
-## Group 2 — 启动诊断与搜索 (5)
+## Group 2 — 路径、设置与克隆 (5 commits, pushed)
 
-6. SHELL-13 启动失败诊断：保留 stderr、退出码、尝试过的路径，可复制。
-7. FIND-02 搜索选项：大小写 / 整词 / 正则。
-8. FIND-05 结果计数与导航：`3/17`、循环、Esc 回底。
-9. FIND-13 正则错误提示：就地显示错误位置。
-10. FIND-06 已完成（滚动条标记）；改做 SEL-12 复制路径：当前目录 / 选中路径。
+5. PATH-08 / PANEL-09：路径可按系统 / Git Bash / WSL / 引号 / URI 五种形式复制。
+6. CFG-06：`${VAR}` 从环境变量展开，不执行命令。
+7. TAB-13：`Ctrl/Cmd-Shift-K` 克隆会话到新标签，同程序同目录。
+8. CFG-16：首次运行写出带注释的 `config.toml`。
+9. 文件拆分，保持每份源码在 500 行以内。
 
-## Group 3 — 标签、窗格与配置 (5)
+## Group 3 — 命令块、协议与状态 (7 commits, pushed)
 
-11. TAB-15 分屏比例：拖动分隔条、双击均分、持久化。
-12. TAB-13 克隆标签：同 profile 同 cwd 开新标签。
-13. CFG-16 生成带注释的默认 `config.toml`。
-14. CFG-06 环境变量插值：`${HOME}` / `${USER}`。
-15. PATH-08 复制路径格式：Windows / POSIX / WSL / URI。
+10. BLOCK-03 / 05 / 10 / 11、STAT-19：命令文本捕获、块导航、失败列表、导出（文本 / Markdown / JSON）。
+11. PROTO-13：OSC 633 与 133 同读，`aid` / `err` 等选项不再作废标记。
+12. PROTO-10：47 / 1047 / 1048 改写成 1049 交给解析器。
+13. STAT-17：终端列标题显示 Git 分支。
+14. STAT-14 / CONN-18：状态行（连接、列数、分支）与会话行上的连接前缀。
 
-## Group 4 — 命令块 (5)
+## Group 4 — 分层设置 (2 commits, pushed)
 
-16. BLOCK-03 复制命令 / 输出。
-17. BLOCK-05 块导航：上一条 / 下一条 / 上一条失败。
-18. BLOCK-10 导出块：文本 / Markdown / JSON。
-19. BLOCK-11 命令历史索引：按退出码与耗时统计。
-20. BLOCK-06 块 gutter 状态色：运行中 / 成功 / 失败。
+15. CFG-05：`include` 多文件叠放，成环即停，缺失点名。
+16. 种子文件说明 `include`。
 
-## Group 5 — 协议与状态 (5)
+## Group 5 — 健康检查 (2 commits, pushed)
 
-21. PROTO-10 47/1047/1048 旧备用屏与保存光标。
-22. PROTO-13 OSC 133 扩展：`k`、`aid`、`cl`、`err`；633 兼容。
-23. STAT-14 状态栏：连接、TERM、尺寸、前台进程。
-24. STAT-17 Git 分支徽标。
-25. CONN-18 连接状态徽标：WSL 发行版、user@host。
+17. future.md §8 第 20 条：`Ctrl-Shift-Alt-H` 报告设置、集成脚本与每台 shell 的状况，叠在终端上并可复制。
+
+## 未做（留给下一轮）
+
+`PERF-01/02/10`（行级 damage、shaping 缓存、性能面板）需要改渲染核心，`TAB-15`（拖动分屏比例）
+需要改布局与命中测试，`CFG-09`（键位自定义）需要一张 action 表与录制 UI。这三块风险最大，
+应各自单独一轮，配人工验收。
