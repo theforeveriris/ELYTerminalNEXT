@@ -18,7 +18,7 @@ use gpui::{
     Task, Window, div,
 };
 
-use crate::{editor, git, sessions, settings::SettingsStore};
+use crate::{editor, git, location, sessions, settings::SettingsStore};
 
 /// A folder's entry: its name, and whether it is a folder, links followed.
 #[derive(Debug, PartialEq)]
@@ -278,14 +278,39 @@ impl Render for Files {
         let (load, open, selecting) = (cx.entity(), cx.entity(), cx.entity());
         let selected: Vec<SharedString> = self.selected.iter().map(|path| key(path)).collect();
         let chosen = self.selected.clone();
-        let copy = IconButton::new("copy-path", IconName::Copy)
-            .tooltip("Copy path")
-            .on_click(move |_, _, cx| {
-                if let Some(path) = &chosen {
-                    cx.write_to_clipboard(ClipboardItem::new_string(path.display().to_string()));
-                    log::info!("files: copied {}", path.display());
-                }
-            });
+        // PATH-08: a path is copied in the form the user names, not only as the platform writes it.
+        let forms: Vec<(location::As, SharedString)> = vec![
+            (location::As::Native, "As the system writes it".into()),
+            (location::As::Posix, "As Git Bash reads it".into()),
+            (location::As::Wsl, "As WSL reads it".into()),
+            (location::As::Quoted, "Quoted for a shell".into()),
+            (location::As::Uri, "As a file URI".into()),
+        ];
+        let mut menu = ely_gpui_component::menus::Menu::new();
+        for (as_, label) in forms {
+            let path = self.selected.clone();
+            menu = menu.item(ely_gpui_component::menus::MenuItem::new(label).on_click(
+                move |_, cx| {
+                    let Some(path) = &path else {
+                        return;
+                    };
+                    let text = location::written(path, as_);
+                    cx.write_to_clipboard(ClipboardItem::new_string(text.clone()));
+                    log::info!("files: copied {text}");
+                },
+            ));
+        }
+        let copy = ely_gpui_component::menus::ContextMenu::new("copy-path-forms", menu).child(
+            IconButton::new("copy-path", IconName::Copy)
+                .tooltip("Copy path")
+                .on_click(move |_, _, cx| {
+                    if let Some(path) = &chosen {
+                        let text = location::written(path, location::As::Native);
+                        cx.write_to_clipboard(ClipboardItem::new_string(text.clone()));
+                        log::info!("files: copied {text}");
+                    }
+                }),
+        );
         let chosen = self.selected.clone();
         let reveal = IconButton::new("reveal-path", IconName::FolderOpen)
             .tooltip("Show in the file manager")

@@ -104,6 +104,46 @@ fn a_git_bash_path_and_a_windows_path_round_trip() {
 }
 
 #[test]
+fn a_path_is_copied_in_the_form_the_user_names() {
+    let path = PathBuf::from(if cfg!(windows) {
+        r"C:\Users\me\src"
+    } else {
+        "/home/me/src"
+    });
+    assert_eq!(written(&path, As::Native), path.display().to_string());
+    if cfg!(windows) {
+        assert_eq!(written(&path, As::Posix), "/c/Users/me/src");
+        assert_eq!(written(&path, As::Wsl), "/mnt/c/Users/me/src");
+        assert_eq!(written(&path, As::Uri), "file:///C:/Users/me/src");
+    } else {
+        assert_eq!(written(&path, As::Posix), "/home/me/src");
+        assert_eq!(written(&path, As::Uri), "file:///home/me/src");
+    }
+    let spaces = PathBuf::from(if cfg!(windows) {
+        r"C:\a b\c.txt"
+    } else {
+        "/a b/c.txt"
+    });
+    let quoted = written(&spaces, As::Quoted);
+    assert!(quoted.starts_with(['\'', '"']), "{quoted:?} is quoted");
+    assert!(quoted.contains("a b"), "{quoted:?} keeps the space");
+    assert_eq!(written(&PathBuf::new(), As::Quoted), "''");
+}
+
+#[test]
+fn a_uri_escapes_what_it_cannot_hold() {
+    let path = PathBuf::from(if cfg!(windows) {
+        r"C:\Users\me\我的 src"
+    } else {
+        "/home/me/我的 src"
+    });
+    let uri = written(&path, As::Uri);
+    assert!(uri.starts_with("file://"), "{uri}");
+    assert!(uri.contains("%"), "{uri} escapes what a URI may not hold");
+    assert!(!uri.contains(' '), "{uri} holds no raw space");
+}
+
+#[test]
 fn a_location_shows_where_it_is() {
     assert_eq!(Location::local(r"C:\src").display(), r"C:\src");
     let wsl = Location::Wsl {

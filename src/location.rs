@@ -87,7 +87,101 @@ impl From<PathBuf> for Location {
     }
 }
 
-/// `bytes` with each `%XX` decoded, when the result is UTF-8.
+/// How a path is written when it is copied.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum As {
+    /// As the platform writes it: `C:\Users\me\src`, or `/home/me/src`.
+    #[default]
+    Native,
+    /// As a POSIX shell reads it: `/c/Users/me/src` from `C:\Users\me\src`.
+    Posix,
+    /// As WSL reads it: `/mnt/c/Users/me/src`.
+    Wsl,
+    /// Quoted, so a shell that reads it reads one path.
+    Quoted,
+    /// A `file:` URI, with each byte the URI may not hold escaped.
+    Uri,
+}
+
+/// `path` as `as` writes it; a form that does not apply to it falls back to the platform's own.
+pub fn written(path: &Path, as_: As) -> String {
+    let Some(text) = path.to_str() else {
+        return path.display().to_string();
+    };
+    let mapped = match as_ {
+        As::Native => None,
+        As::Posix => windows_to_posix(text),
+        As::Wsl => windows_to_wsl(text),
+        As::Quoted => None,
+        As::Uri => return uri(text),
+    };
+    let text = mapped.as_deref().unwrap_or(text);
+    match as_ {
+        As::Quoted => quote(text),
+        _ => text.to_owned(),
+    }
+}
+
+/// `path` as a POSIX or Windows shell takes it in one piece: what it reads specially is escaped.
+fn quote(path: &str) -> String {
+    if path.is_empty() {
+        return "''".to_string();
+    }
+    if cfg!(windows) {
+        return format!("\"{}\"", path.replace('"', "\\\""));
+    }
+    let special = path.chars().any(|c| {
+        matches!(
+            c,
+            ' ' | '\''
+                | '"'
+                | '\\'
+                | '$'
+                | '`'
+                | '*'
+                | '?'
+                | '('
+                | ')'
+                | ';'
+                | '&'
+                | '|'
+                | '<'
+                | '>'
+                | '!'
+                | '#'
+                | '~'
+        )
+    });
+    if !special {
+        return path.to_owned();
+    }
+    format!("'{}'", path.replace('\'', r"'\''"))
+}
+
+/// `path` as a `file:` URI; on Windows, `C:\a` is `file:///C:/a`.
+fn uri(path: &str) -> String {
+    let text = path.replace('\\', "/");
+    let text = if cfg!(windows) {
+        let drive = text.as_bytes().get(1) == Some(&b':');
+        match drive {
+            true => format!("/{text}"),
+            false => text,
+        }
+    } else {
+        text
+    };
+    let mut out = String::from("file://");
+    for byte in text.bytes() {
+        match byte {
+            // What a URI may hold unescaped, and what the user reads best unescaped.
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' | b'/' | b':' => {
+                out.push(char::from(byte))
+            }
+            _ => out.push_str(&format!("%{byte:02X}")),
+        }
+    }
+    out
+}
 pub fn percent_decode(bytes: &[u8]) -> Option<String> {
     let mut out = Vec::with_capacity(bytes.len());
     let mut at = 0;
