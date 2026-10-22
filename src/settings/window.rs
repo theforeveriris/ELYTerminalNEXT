@@ -10,8 +10,8 @@ use ely_gpui_component::{
     theme::{ActiveTheme, ControlSize, IconSize},
 };
 use gpui::{
-    AnyElement, App, AppContext, Bounds, Context, Entity, FocusHandle, InteractiveElement,
-    IntoElement, KeyBinding, ParentElement, Render, SharedString, StatefulInteractiveElement,
+    App, AppContext, Bounds, Context, Entity, FocusHandle, InteractiveElement, IntoElement,
+    KeyBinding, ParentElement, Render, ScrollHandle, SharedString, StatefulInteractiveElement,
     StyleRefinement, Styled, Subscription, Task, TitlebarOptions, Window,
     WindowBackgroundAppearance, WindowBounds, WindowDecorations, WindowOptions, actions, div,
     prelude::FluentBuilder, px, size,
@@ -20,10 +20,12 @@ use gpui::{
 use super::{Settings, SettingsStore};
 use crate::settings::CursorStyle;
 use crate::{app::APP_ID, menus, settings::language, term::BLINK, updates::Updates};
+use page::PageView;
 
 mod appearance;
 mod custom;
 mod general;
+mod page;
 mod preview;
 mod terminal;
 mod text;
@@ -122,6 +124,8 @@ pub struct SettingsWindow {
     lit: bool,
     /// The open page, in a view of its own: a scroll reuses its layout instead of building fifteen theme cards again.
     page: Option<Entity<PageView>>,
+    /// How far down the page is scrolled.
+    page_scroll: ScrollHandle,
     _typed: Subscription,
     _start: Subscription,
     _editor: Subscription,
@@ -129,18 +133,6 @@ pub struct SettingsWindow {
     _settings: Subscription,
     _updates: Subscription,
     _blink: Task<()>,
-}
-
-/// The open page, drawn apart from the window's frame so the frame's scroll does not rebuild it.
-pub struct PageView {
-    settings: Entity<SettingsWindow>,
-}
-
-impl Render for PageView {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let settings = self.settings.clone();
-        settings.read(cx).page(&settings, window, cx)
-    }
 }
 
 impl SettingsWindow {
@@ -215,6 +207,7 @@ impl SettingsWindow {
             adding: false,
             lit: true,
             page: None,
+            page_scroll: ScrollHandle::new(),
             _typed: typed,
             _start: start_typed,
             _editor: editor_typed,
@@ -412,25 +405,6 @@ fn set(
     saved
 }
 
-impl SettingsWindow {
-    /// The open page, with the failure it shows above it. Drawn by `PageView`, so a scroll of the window reuses it.
-    fn page(&self, this: &Entity<SettingsWindow>, window: &Window, cx: &App) -> AnyElement {
-        let page = match self.section.as_ref() {
-            "appearance" => self.appearance(this, window, cx).into_any_element(),
-            "terminal" => self.terminal(this, cx).into_any_element(),
-            "general" => self.general(this, cx).into_any_element(),
-            other => unreachable!("settings: no section {other}"),
-        };
-        div()
-            .flex()
-            .flex_col()
-            .gap_4()
-            .children((self.failed.clone()).map(|why| InlineMessage::new(Severity::Danger, why)))
-            .child(page)
-            .into_any_element()
-    }
-}
-
 impl Render for SettingsWindow {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         window.set_rem_size(px(SettingsStore::get(cx).ui_font_size));
@@ -444,10 +418,11 @@ impl Render for SettingsWindow {
                 page
             }
         };
+        // The page fills the body and scrolls inside itself; the body only pads it.
         let body = div()
             .id("settings-body")
             .size_full()
-            .overflow_y_scroll()
+            .min_h_0()
             .p_6()
             .child(page.cached(StyleRefinement::default().size_full()));
         let (key, _) = SECTIONS
@@ -458,6 +433,7 @@ impl Render for SettingsWindow {
         let list = div()
             .id("settings-list")
             .size_full()
+            .min_h_0()
             .overflow_y_scroll()
             .p_2()
             .child(sections(&self.section, cx));
@@ -469,7 +445,10 @@ impl Render for SettingsWindow {
                     .title(language::message(cx, "settings.window"))
                     .child(list),
             )
-            .column(ShellColumn::new("settings-page").title(name).child(body));
+            .column(ShellColumn::new("settings-page").title(name).child(
+                // Pinned to the column's box, which the window sizes; left to auto height the body would grow with its rows and have nothing to scroll.
+                div().absolute().inset_0().child(body),
+            ));
         // The context sits above the focus root, so its keys work wherever focus is.
         div()
             .size_full()
