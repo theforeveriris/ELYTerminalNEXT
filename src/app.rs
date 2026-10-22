@@ -141,7 +141,10 @@ pub fn open(launch: Launch, cx: &mut App) -> anyhow::Result<WindowHandle<Workspa
     let background = blur::appearance(SettingsStore::get(cx));
     let least = px(*settings::WINDOW.start());
     let options = WindowOptions {
-        window_bounds: Some(WindowBounds::Windowed(bounds)),
+        window_bounds: Some(opening_window_bounds(
+            SettingsStore::get(cx).window_maximized,
+            bounds,
+        )),
         // No smaller than the settings keep.
         window_min_size: Some(size(least, least)),
         titlebar: Some(TitlebarOptions {
@@ -173,6 +176,15 @@ pub fn open(launch: Launch, cx: &mut App) -> anyhow::Result<WindowHandle<Workspa
         std::env::consts::OS
     );
     Ok(window)
+}
+
+/// The window's bounds as the settings kept them: maximized, or windowed where it stood.
+fn opening_window_bounds(maximized: bool, bounds: Bounds<Pixels>) -> WindowBounds {
+    if maximized {
+        WindowBounds::Maximized(bounds)
+    } else {
+        WindowBounds::Windowed(bounds)
+    }
 }
 
 /// The kept size and position, within the primary display's visible area where that is known.
@@ -236,12 +248,13 @@ fn keep_size(window: &mut Window, cx: &mut Context<Workspace>) {
             cx.background_executor().timer(SETTLE).await;
             // Read once settled: X11 marks a window maximized late, and unmaximized while hidden.
             let kept = cx.update(|window, cx| {
-                if !window.is_visible() || window.is_maximized() || window.is_fullscreen() {
+                if !window.is_visible() || window.is_fullscreen() {
                     log::debug!(
-                        "app: the window is hidden, maximized or full screen; its kept size stays"
+                        "app: the window is hidden or full screen; its kept size stays"
                     );
                     return Ok(());
                 }
+                let maximized = window.is_maximized();
                 let area = window.window_bounds().get_bounds();
                 let (width, height) = (
                     f32::from(area.size.width).round(),
@@ -252,10 +265,13 @@ fn keep_size(window: &mut Window, cx: &mut Context<Workspace>) {
                     f32::from(area.origin.y).round(),
                 );
                 SettingsStore::update(cx, |settings| {
-                    settings.window_width = width;
-                    settings.window_height = height;
-                    settings.window_x = Some(x);
-                    settings.window_y = Some(y);
+                    settings.window_maximized = maximized;
+                    if !maximized {
+                        settings.window_width = width;
+                        settings.window_height = height;
+                        settings.window_x = Some(x);
+                        settings.window_y = Some(y);
+                    }
                 })
                 .with_context(|| {
                     format!("app: the window's size and place, {width} by {height} at {x},{y}, are not kept")

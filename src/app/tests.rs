@@ -1,4 +1,17 @@
-use super::clamp_origin;
+use super::*;
+
+#[test]
+fn a_window_opens_maximized_when_it_settled_that_way() {
+    let bounds = Bounds::new(point(px(10.0), px(20.0)), size(px(800.0), px(600.0)));
+    assert!(matches!(
+        opening_window_bounds(true, bounds),
+        WindowBounds::Maximized(_)
+    ));
+    assert!(matches!(
+        opening_window_bounds(false, bounds),
+        WindowBounds::Windowed(_)
+    ));
+}
 
 #[test]
 fn a_window_kept_inside_the_screen_stays_where_it_was() {

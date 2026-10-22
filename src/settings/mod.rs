@@ -114,6 +114,8 @@ pub struct Settings {
     /// Where the main window's top-left sat, unmaximized; none centers it.
     pub window_x: Option<f32>,
     pub window_y: Option<f32>,
+    /// Whether the main window was maximized when it last settled.
+    pub window_maximized: bool,
     /// The language of the interface; the system's by default.
     pub language: Language,
     /// The colors of the theme of the user's own.
@@ -161,6 +163,7 @@ impl Default for Settings {
             window_height: 760.0,
             window_x: None,
             window_y: None,
+            window_maximized: false,
             language: Language::default(),
             custom_colors: themes::Colors::default(),
             extra: HashMap::new(),
