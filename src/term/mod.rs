@@ -1,6 +1,7 @@
-﻿mod blocks;
+mod blocks;
 mod boxes;
 mod click;
+mod clipboard;
 pub(crate) mod device;
 mod drop;
 mod find;

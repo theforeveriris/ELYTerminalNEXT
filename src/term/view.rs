@@ -314,8 +314,17 @@ impl TerminalView {
                 cx.emit(TerminalEvent::Bell);
             }
             Event::ClipboardStore(kind, text) => {
-                log::info!("terminal {}: OSC 52 writes the {kind:?}", self.pty.pid);
-                self.copy_text(text, kind == ClipboardType::Selection, cx);
+                // SEL-08: a write that fits goes on; one past the limit is refused and logged.
+                match super::clipboard::keep(text) {
+                    Some(text) => {
+                        log::info!("terminal {}: OSC 52 writes the {kind:?}", self.pty.pid);
+                        self.copy_text(text, kind == ClipboardType::Selection, cx);
+                    }
+                    None => log::warn!(
+                        "terminal {}: OSC 52 writes more than the clipboard keeps",
+                        self.pty.pid
+                    ),
+                }
             }
             Event::ClipboardLoad(..) => log::error!(
                 "terminal {}: a clipboard read arrived though OSC 52 reads are off",

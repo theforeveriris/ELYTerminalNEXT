@@ -222,7 +222,7 @@ fn hover_lists_each_record_with_its_app_then_a_failed_command() {
         "eu/db".into(),
         record(State::Done, None, None, [Some("db"), None, None]),
     );
-    let lines: Vec<String> = hover(&records, Some(2))
+    let lines: Vec<String> = hover(&records, Some(2), &[])
         .iter()
         .map(ToString::to_string)
         .collect();
@@ -238,7 +238,23 @@ fn hover_lists_each_record_with_its_app_then_a_failed_command() {
     for at in 0..LISTED {
         records.report(format!("r{at}"), record(State::Idle, None, None, [None; 3]));
     }
-    let lines = hover(&records, None);
+    let lines = hover(&records, None, &[]);
     assert_eq!(lines.len(), LISTED + 1);
     assert_eq!(lines[LISTED].to_string(), "3 more");
+    // STAT-19: the commands that failed are named, one alone by itself and several by count.
+    let one: Vec<String> = hover(&records, None, &["cargo test"])
+        .iter()
+        .map(ToString::to_string)
+        .collect();
+    assert!(
+        one.contains(&"1 command failed: cargo test".to_string()),
+        "{one:?}"
+    );
+    let two: Vec<String> = hover(&records, None, &["cargo test", "make"])
+        .iter()
+        .map(ToString::to_string)
+        .collect();
+    assert!(two.contains(&"2 commands failed".to_string()), "{two:?}");
+    assert!(two.contains(&"  cargo test".to_string()), "{two:?}");
+    assert!(two.contains(&"  make".to_string()), "{two:?}");
 }

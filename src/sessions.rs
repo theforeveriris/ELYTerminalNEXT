@@ -260,7 +260,17 @@ fn mark(session: &Session, now: Instant, cx: &App) -> Option<AnyElement> {
     let tip = Tooltip::rich(move |window, cx| {
         let lines = watched.upgrade().map_or_else(Vec::new, |terminal| {
             let view = terminal.read(cx);
-            hover(view.records(), view.ended().filter(|&code| code != 0))
+            let failed: Vec<&str> = view
+                .blocks()
+                .failures()
+                .into_iter()
+                .map(|(_, command, _)| command)
+                .collect();
+            hover(
+                view.records(),
+                view.ended().filter(|&code| code != 0),
+                &failed,
+            )
         });
         let room = window.viewport_size().height - rems(3.).to_pixels(window.rem_size());
         div()
@@ -286,8 +296,8 @@ fn mark(session: &Session, now: Instant, cx: &App) -> Option<AnyElement> {
     )
 }
 
-/// What hover shows: a line for each record, ten at most, then a failed command's status.
-pub fn hover(records: &Records, failed: Option<i32>) -> Vec<SharedString> {
+/// A session's hover: each record it holds, at most `LISTED`, then how many more, then what its last command and its failures came to.
+pub fn hover(records: &Records, failed: Option<i32>, failures: &[&str]) -> Vec<SharedString> {
     let mut lines: Vec<SharedString> = records
         .iter()
         .take(LISTED)
@@ -299,6 +309,17 @@ pub fn hover(records: &Records, failed: Option<i32>) -> Vec<SharedString> {
     }
     if let Some(code) = failed {
         lines.push(format!("Last command exited with {code}").into());
+    }
+    // STAT-19: the commands that failed in this session, newest last, so a row says how many.
+    match failures.len() {
+        0 => {}
+        1 => lines.push(format!("1 command failed: {}", failures[0]).into()),
+        count => {
+            lines.push(format!("{count} commands failed").into());
+            for command in failures.iter().take(LISTED) {
+                lines.push(format!("  {command}").into());
+            }
+        }
     }
     lines
 }

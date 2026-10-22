@@ -69,9 +69,15 @@ pub fn bind(cx: &mut App) {
         KeyBinding::new("ctrl-shift-alt-h", CheckHealth, context),
         KeyBinding::new("ctrl-shift-alt-e", EvenPanes, context),
         // TAB-03 and TAB-04: the tab moves among its neighbours, or stays where it is for good.
-        KeyBinding::new("ctrl-shift-alt-up", MoveTabUp, context),
-        KeyBinding::new("ctrl-shift-alt-down", MoveTabDown, context),
+        KeyBinding::new("ctrl-shift-alt-pageup", MoveTabUp, context),
+        KeyBinding::new("ctrl-shift-alt-pagedown", MoveTabDown, context),
         KeyBinding::new("ctrl-shift-alt-p", PinTab, context),
+        // INP-14: the searchable list of every key, where the settings window keeps it.
+        KeyBinding::new(
+            "ctrl-shift-/",
+            crate::settings::window::OpenSettings,
+            context,
+        ),
     ]);
     cx.bind_keys([
         KeyBinding::new(new, NewSession, context),

@@ -13,13 +13,14 @@ use crate::{
     menus::{Bigger, Minimize, Quit, ResetSize, Smaller},
     settings::{OptionAsAlt, SCROLLBACK, SettingsStore, StartIn, language},
     term::{
-        input::{self, Find, NextPrompt, PreviousPrompt},
+        input::{self, ExportBlocks, Find, NextFailed, NextPrompt, PreviousFailed, PreviousPrompt},
         shell::{ShellIntegration, Shells, repair_installed},
     },
     updates::{self, Updates, VERSION},
     workspace::{
-        self, CloneSession, CloseSession, LastSession, NewSession, NextSession, NextUsed,
-        PreviousSession, PreviousUsed, SelectSession, TogglePanel, ToggleSessions,
+        self, CheckHealth, CloneSession, CloseSession, EvenPanes, LastSession, MoveTabDown,
+        MoveTabUp, NewSession, NextSession, NextUsed, PinTab, PreviousSession, PreviousUsed,
+        SelectSession, TogglePanel, ToggleSessions,
     },
 };
 
@@ -346,6 +347,14 @@ thread_local! {
             ("Tabs", "Next used tab", NextUsed.boxed_clone()),
             ("Tabs", "Previous used tab", PreviousUsed.boxed_clone()),
             ("Tabs", "Clone session in a new tab", CloneSession.boxed_clone()),
+            ("Tabs", "Move tab up", MoveTabUp.boxed_clone()),
+            ("Tabs", "Move tab down", MoveTabDown.boxed_clone()),
+            ("Tabs", "Pin tab", PinTab.boxed_clone()),
+            ("Panes", "Even the panes", EvenPanes.boxed_clone()),
+            ("Panes", "Previous failed command", PreviousFailed.boxed_clone()),
+            ("Panes", "Next failed command", NextFailed.boxed_clone()),
+            ("Panes", "Copy the commands as Markdown", ExportBlocks(Default::default()).boxed_clone()),
+            ("App", "Check the machine", CheckHealth.boxed_clone()),
             ("Edit", "Copy", Copy.boxed_clone()),
             ("Edit", "Paste", Paste.boxed_clone()),
             ("Edit", "Select all", SelectAll.boxed_clone()),
