@@ -20,7 +20,7 @@ use crate::themes;
 
 pub use language::Language;
 pub use seed::commented;
-pub use store::{SettingsStore, load};
+pub use store::{SettingsStore, load, load_any};
 pub use write::save;
 
 /// Where a new session starts.

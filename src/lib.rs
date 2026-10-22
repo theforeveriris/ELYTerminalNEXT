@@ -3,6 +3,7 @@ pub mod blur;
 pub mod editor;
 pub mod files;
 pub mod git;
+pub mod health;
 pub mod location;
 pub mod menus;
 pub mod pet;

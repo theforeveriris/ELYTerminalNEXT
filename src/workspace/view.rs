@@ -2,6 +2,8 @@
 
 use std::time::Instant;
 
+use super::chrome::{column_toggle, show_tab};
+
 use ely_gpui_component::{
     buttons::{Button, ButtonVariant, IconButton, SegmentedControl},
     forms::Input,
@@ -28,37 +30,6 @@ use crate::settings::window::OpenSettings;
 use crate::settings::{PanelTab, Settings, SettingsStore, language};
 use crate::term::Failed;
 use crate::workspace::TITLE;
-
-/// Shows Git or Files in the right column, as the settings keep it.
-fn show_tab(value: &SharedString, cx: &mut App) {
-    let panel = match value.as_ref() {
-        "git" => PanelTab::Git,
-        "files" => PanelTab::Files,
-        other => unreachable!("app: no {other} tab"),
-    };
-    if SettingsStore::get(cx).panel == panel {
-        return;
-    }
-    match SettingsStore::update(cx, |settings| settings.panel = panel) {
-        Ok(()) => log::info!("app: the right column shows {panel:?}"),
-        Err(error) => log::error!("app: the right column stays: {error:#}"),
-    }
-}
-
-/// A header button that hides or shows a column, saved.
-fn column_toggle(
-    workspace: &Entity<Workspace>,
-    (id, icon): (&'static str, IconName),
-    tip: String,
-    flip: fn(&mut Settings),
-) -> IconButton {
-    let workspace = workspace.clone();
-    IconButton::new(id, icon)
-        .variant(ButtonVariant::Ghost)
-        .size(ControlSize::Sm)
-        .tooltip(tip)
-        .on_click(move |_, _, cx| workspace.update(cx, |this, cx| this.toggle(flip, cx)))
-}
 
 impl Workspace {
     /// The sessions column: a row for each tab, and under the shown one a row for each of its panes.
@@ -210,6 +181,22 @@ impl Workspace {
         }
     }
 
+    /// The report of the health check, over the terminal, until the next key takes it away.
+    fn health(&self) -> impl IntoElement {
+        let Some(report) = &self.health else {
+            return div();
+        };
+        let card = div()
+            .absolute()
+            .top_2()
+            .left_2()
+            .right_2()
+            .p_3()
+            .border_1()
+            .child(Caption::new(SharedString::from(report.text())));
+        div().relative().child(card)
+    }
+
     /// The panes of the shown tab, laid out as a grid.
     fn panes(&self) -> impl IntoElement {
         let Some(tab) = self.tab() else {
@@ -303,6 +290,8 @@ impl Render for Workspace {
                 )
             })
             .map(|cells| status::of(self.session(self.active), cells));
+        // The health check's report, over the terminal, until the next key takes it away.
+        terminal = terminal.child(self.health());
         // STAT-17: which branch the shown session's folder sits in, when it sits in one.
         let badge = self
             .session(self.active)

@@ -16,8 +16,10 @@ use crate::{
 };
 
 mod badge;
+mod chrome;
 mod events;
 mod filter;
+mod health;
 mod layout;
 mod mru;
 mod rename;
@@ -52,7 +54,8 @@ actions!(
         ClosePane,
         ZoomPane,
         Zen,
-        CloneSession
+        CloneSession,
+        CheckHealth
     ]
 );
 
@@ -136,9 +139,10 @@ pub fn bind_keys(cx: &mut App) {
         KeyBinding::new(&format!("{pane}-w"), ClosePane, context),
         KeyBinding::new(zoom, ZoomPane, context),
         KeyBinding::new(zen, Zen, context),
+        // TAB-13 and the health check: a clone of the session, and a report on the machine.
+        KeyBinding::new(tab_clone, CloneSession, context),
+        KeyBinding::new("ctrl-shift-alt-h", CheckHealth, context),
     ]);
-    // TAB-13: a clone opens beside what it copies, with no scrollback and no running state.
-    cx.bind_keys([KeyBinding::new(tab_clone, CloneSession, context)]);
     cx.bind_keys([
         KeyBinding::new(new, NewSession, context),
         KeyBinding::new(close, CloseSession, context),
@@ -212,6 +216,8 @@ pub struct Workspace {
     filter: filter::Filter,
     /// Why the session this window opened with could not start, while it keeps none.
     pub(crate) start_failed: Option<Failed>,
+    /// The health check's report while the user has it open.
+    pub(crate) health: Option<crate::health::Report>,
     _settings: Subscription,
     _acted: Subscription,
 }
@@ -290,6 +296,7 @@ impl Workspace {
             mru: mru::Mru::default(),
             filter: filter::Filter::new(window, cx),
             start_failed: failed,
+            health: None,
             _settings: cx.observe_global_in::<SettingsStore>(window, |this, window, cx| {
                 this.background.follow(window, SettingsStore::get(cx));
                 cx.notify();
