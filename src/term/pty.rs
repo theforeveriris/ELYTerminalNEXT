@@ -106,14 +106,14 @@ pub const STDERR: usize = 8;
 /// the program wrote itself, which is where a shell says why it will not run.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Failed {
-    /// The program and its arguments, as the settings or the scan named them.
+    /// The program and its arguments, as the settings or the scan named them; none runs the login shell.
     pub program: Option<(String, Vec<String>)>,
     /// The folder the session was to start in.
     pub cwd: PathBuf,
     /// What the system said; the error's own words, with its causes.
-    pub error: String,
+    pub error: Box<str>,
     /// The first lines the program wrote before it ended.
-    pub said: Vec<String>,
+    pub said: Box<[String]>,
 }
 
 impl Failed {
@@ -148,7 +148,7 @@ pub fn failed(
     Failed {
         program: program.cloned(),
         cwd,
-        error: format!("{error:#}"),
+        error: format!("{error:#}").into(),
         said: said.into_iter().take(STDERR).collect(),
     }
 }
