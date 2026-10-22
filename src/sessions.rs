@@ -13,7 +13,7 @@ use ely_gpui_component::{
 use gpui::{AnyElement, App, Entity, SharedString, Subscription, div, prelude::*, rems};
 
 use crate::{
-    term::{Block, Kind, Record, Records, State, TerminalView},
+    term::{Block, Kind, Record, Records, State, Target, TerminalView},
     workspace::{TITLE, Workspace},
 };
 
@@ -138,6 +138,10 @@ pub fn row(
     let terminal = session.terminal.read(cx);
     let pid = terminal.pid() as usize;
     let mut description = shown(&session.folder, home);
+    // CONN-18: which machine or distribution the session sits on, when it is not this one.
+    if let Some(where_) = connection(&session.launch) {
+        description = format!("{where_} \u{b7} {description}");
+    }
     if let Some(note) = terminal.blocks().last_finished().and_then(block_note) {
         description.push_str(&note);
     }
@@ -187,6 +191,26 @@ pub fn row(
             .children(mark)
             .children(bell),
     )
+}
+
+/// Where a session sits, when it is not this machine: its WSL distribution, or the host it sshs to.
+///
+/// The launch is what the session was started with, so a WSL shell names its distribution and an
+/// ssh one the host in its arguments — the host the session was given, not one guessed from output.
+pub fn connection(launch: &crate::term::Launch) -> Option<String> {
+    match &launch.target {
+        Target::Wsl { distro } if distro != "default" => Some(format!("WSL: {distro}")),
+        Target::Wsl { .. } => Some("WSL".into()),
+        _ => {
+            let (program, args) = launch.program.as_ref()?;
+            let name = std::path::Path::new(program).file_stem()?.to_string_lossy();
+            if !name.eq_ignore_ascii_case("ssh") {
+                return None;
+            }
+            let host = args.iter().rev().find(|arg| !arg.starts_with('-'))?;
+            Some(format!("ssh: {host}"))
+        }
+    }
 }
 
 /// The field a session's row renames it with; Escape drops what it holds.

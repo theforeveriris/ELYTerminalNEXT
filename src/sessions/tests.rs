@@ -1,6 +1,53 @@
 use super::*;
 
 #[test]
+fn a_session_on_another_machine_says_which_one() {
+    let launch = |program: Option<(&str, &[&str])>, target: Target| crate::term::Launch {
+        program: program.map(|(program, args)| {
+            (
+                program.to_string(),
+                args.iter().map(ToString::to_string).collect(),
+            )
+        }),
+        cwd: PathBuf::from("/home/me"),
+        env: Vec::new(),
+        reports: false,
+        quote: crate::term::Quote::Posix,
+        target,
+    };
+    let local = launch(Some(("/bin/bash", &[])), Target::Local);
+    assert_eq!(connection(&local), None, "this machine says nothing");
+    let wsl = launch(
+        None,
+        Target::Wsl {
+            distro: "archlinux".into(),
+        },
+    );
+    assert_eq!(connection(&wsl).as_deref(), Some("WSL: archlinux"));
+    let default = launch(
+        None,
+        Target::Wsl {
+            distro: "default".into(),
+        },
+    );
+    assert_eq!(
+        connection(&default).as_deref(),
+        Some("WSL"),
+        "no name to give"
+    );
+    let ssh = launch(
+        Some((
+            "C:\\Windows\\System32\\OpenSSH\\ssh.exe",
+            &["-p", "2222", "me@host"],
+        )),
+        Target::Local,
+    );
+    assert_eq!(connection(&ssh).as_deref(), Some("ssh: me@host"));
+    let shell = launch(Some(("/bin/zsh", &[])), Target::Local);
+    assert_eq!(connection(&shell), None, "a shell on this machine");
+}
+
+#[test]
 fn folders_under_home_read_from_a_tilde() {
     let home = PathBuf::from("/Users/ely");
     let shown = |folder: &str| shown(Path::new(folder), Some(&home));
