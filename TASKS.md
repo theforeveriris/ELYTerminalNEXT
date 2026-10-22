@@ -402,3 +402,18 @@ Progress truth. Top to bottom, one at a time. A task is ticked only after its co
 - [x] T74 A first run writes a config file that says what each field sets, as CFG-16 asks: with neither `config.toml` nor `settings.json` there, the app writes a `config.toml` of the defaults, each field under a comment naming what it sets and what else it could be; an existing file is never overwritten.
 
   - 首次运行写出一份能说明每个字段设置什么的配置文件，这是 CFG-16 所要求的：在既无 `config.toml` 也无 `settings.json` 时，应用写出一份填入默认值的 `config.toml`，每个字段上方一行注释写明它设置什么以及还能取什么值；已存在的文件绝不被覆盖。
+
+## 36. Commands, marks and where a session sits
+## 36. 命令、标记与会话所在之处
+
+- [x] T75 A command is kept with the line that was typed, and can be walked, listed and exported, as BLOCK-03, BLOCK-05, BLOCK-10, BLOCK-11 and STAT-19 ask: the line typed between the shell's prompt and its command is read from the grid across soft wraps; Ctrl-Alt-Up and Down walk the commands that ended, Ctrl-Shift-Alt-Up and Down only those that failed, and Ctrl-Shift-Alt-E copies them as Markdown; a summary counts what ran and what failed and names the slowest, and the export comes as text, Markdown or JSON.
+
+  - 命令与输入的那一行一起保存，并可以逐条走过、列出与导出，这是 BLOCK-03、BLOCK-05、BLOCK-10、BLOCK-11 与 STAT-19 所要求的：提示符与命令之间输入的那一行跨软换行从网格读出；Ctrl-Alt-上下 走过已结束的命令，Ctrl-Shift-Alt-上下 只走失败的，Ctrl-Shift-Alt-E 以 Markdown 复制它们；摘要统计跑了多少、失败多少并点名最慢的一条，导出有文本、Markdown 与 JSON 三种。
+
+- [x] T76 The marks a shell writes read the same under OSC 633, and the old alternate screens read as the one vte holds, as PROTO-13 and PROTO-10 ask: VS Code's OSC 633 marks read like 133, with aid, cl, cmdline_url, k and err read past rather than refusing the mark, aid and err kept for the session; modes 47, 1047 and 1048 are passed on to the parser as the 1049 they stand for.
+
+  - shell 写的标记在 OSC 633 下同样读取，旧备用屏按 vte 认识的模式读取，这是 PROTO-13 与 PROTO-10 所要求的：VS Code 的 OSC 633 标记与 133 一样读取，aid、cl、cmdline_url、k 与 err 被读过去而不是让标记作废，aid 与 err 留给会话；模式 47、1047 与 1048 以它们所代表的 1049 转给解析器。
+
+- [x] T77 A session says where it sits, as STAT-14, STAT-17 and CONN-18 ask: the terminal's column shows the branch the shown session's folder sits in, read from the nearest `.git/HEAD` or a worktree's gitfile; a line under the terminal says the connection, the grid's cells and the branch, each left out where it says nothing; a session row on another machine leads with that machine — `WSL: archlinux`, `ssh: host`.
+
+  - 会话说明自己在哪里，这是 STAT-14、STAT-17 与 CONN-18 所要求的：终端列显示当前会话所在目录的 Git 分支，读最近的 `.git/HEAD` 或 worktree 的 gitfile；终端下方一行显示连接、网格的列数与行数以及分支，没有内容的部分就不出现；在另一台机器上的会话行以那台机器开头——`WSL: archlinux`、`ssh: host`。

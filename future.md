@@ -125,7 +125,12 @@
 - **PATH-08 / PANEL-09**：文件面板的复制按钮展开一份菜单，路径可按系统写法、Git Bash 写法、WSL 写法、加引号或 `file:` URI 复制；shell 会特别解读的字符被转义而不是丢弃。见 `src/location.rs` 的 `written`。
 - **CFG-06**：`shell`、`editor`、`start_in_folder` 与 `last_folder` 里的 `${VAR}` 从环境变量展开一次，不执行任何命令；变量没有取值时报错并点名该变量。见 `src/settings/store.rs` 的 `expand`。
 - **TAB-13**：`Ctrl/Cmd-Shift-K` 把当前会话克隆到一个新标签，用同样的程序与环境变量、在它最后报告的目录里启动；回滚缓冲与运行状态不跟随。见 `src/workspace/tabs.rs` 的 `clone_of`。
-- **CFG-16**：既无 `config.toml` 也无 `settings.json` 时，首次运行写出一份 `config.toml`，每个字段上方一行注释说明它设置什么、可选值有哪些；已存在的文件绝不被覆盖。见 `src/settings/mod.rs` 的 `commented`。
+- **CFG-16**：既无 `config.toml` 也无 `settings.json` 时，首次运行写出一份 `config.toml`，每个字段上方一行注释说明它设置什么、可选值有哪些；已存在的文件绝不被覆盖。见 `src/settings/seed.rs` 的 `commented`。
+- **BLOCK-03 / 05 / 10 / 11、STAT-19**：命令块保留在提示符与命令之间输入的那一行（跨软换行从网格读出）；`Ctrl-Alt-↑/↓` 走上一条/下一条命令，`Ctrl-Shift-Alt-↑/↓` 只走失败的，`Ctrl-Shift-Alt-E` 以 Markdown 复制全部命令；`summary` 统计跑了多少条、失败多少条并点名最慢的一条；导出支持文本、Markdown 与 JSON。见 `src/term/blocks.rs` 与 `src/term/view/blocks.rs`。
+- **PROTO-13**：VS Code shell 集成写的 OSC 633 标记与 133 同样读取；标记携带的 `aid`、`cl`、`cmdline_url`、`k`、`err` 不再让整条标记作废，其中 `aid` 与 `err` 被读出来交给会话。见 `src/term/marks.rs`。
+- **PROTO-10**：模式 47、1047、1048 与 1049 要求同一块备用屏，而 vte 不认识前三个，于是 tap 把它们改写成 `CSI ? 1049 h/l` 再送给解析器。见 `src/term/tap/modes.rs`。
+- **STAT-17**：终端列标题显示会话所在目录的 Git 分支，读最近的 `.git/HEAD` 或 worktree 的 gitfile；不在工作树里或处于游离 HEAD 时不显示。见 `src/workspace/badge.rs`。
+- **STAT-14 / CONN-18**：终端下方一行显示会话所在的连接（`WSL: archlinux`、`ssh: host`）、网格的列数与行数、以及所在分支；会话行在非本机时以连接开头。见 `src/workspace/status.rs` 与 `src/sessions.rs` 的 `connection`。
 
 ---
 
