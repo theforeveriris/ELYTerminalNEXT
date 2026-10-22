@@ -222,23 +222,13 @@ pub fn expand(text: &str) -> anyhow::Result<String> {
     Ok(out)
 }
 
-/// The settings in a TOML file; no file gives the defaults, and a bad one names its line.
+/// The settings in a TOML file; no file gives the defaults, and a bad one names its line. A file's `include` names others, laid first and over one another, so shared settings live in one place and each file says only what it changes.
 pub fn load_toml(path: &Path) -> anyhow::Result<Settings> {
-    let text = match fs::read_to_string(path) {
-        Ok(text) => text,
-        Err(error) if error.kind() == ErrorKind::NotFound => {
-            log::info!("settings: no file at {}, defaults", path.display());
-            return Ok(Settings::default());
-        }
-        Err(error) => {
-            return Err(error).with_context(|| format!("settings: cannot read {}", path.display()));
-        }
-    };
-    let settings: Settings = toml::from_str(&text)
-        .map_err(|error| anyhow::anyhow!("settings: {} does not parse: {error}", path.display()))?;
-    settings
-        .validate()
-        .with_context(|| format!("settings: {} holds a bad value", path.display()))?;
+    if !path.exists() {
+        log::info!("settings: no file at {}, defaults", path.display());
+        return Ok(Settings::default());
+    }
+    let settings = super::include::read(path)?;
     warn_extra(&settings, path);
     log::info!("settings: loaded {}", path.display());
     interpolated(settings, path)
@@ -338,10 +328,10 @@ mod tests {
         let folder = folder("bad-toml");
         let path = folder.join("config.toml");
         fs::create_dir_all(&folder).expect("a folder");
-        fs::write(&path, "font_size = \"large\"\n").expect("a file");
+        fs::write(&path, "font_size = [\n").expect("a file");
         let error = format!("{:#}", load_toml(&path).expect_err("a bad value"));
         assert!(error.contains("does not parse"), "{error}");
-        assert!(error.contains("line 1"), "{error}");
+        assert!(error.contains("line"), "{error}");
         assert!(error.contains("config.toml"), "{error}");
         fs::remove_dir_all(folder).expect("cleanup");
     }

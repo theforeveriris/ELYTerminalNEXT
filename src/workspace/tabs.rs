@@ -495,7 +495,7 @@ mod tests {
         assert_eq!(
             started.cwd,
             PathBuf::from("/home/me"),
-            "the original is left alone"
+            "the original stands"
         );
     }
 }
