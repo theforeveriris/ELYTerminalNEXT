@@ -92,6 +92,8 @@ pub struct TerminalView {
     pub(super) notices: Notices,
     /// A bell rang and its flash is still seen.
     pub(super) flash: bool,
+    /// A paste that waits for the user to let it go.
+    pub(super) pending: Option<String>,
     /// The task that ends the flash.
     flashing: Option<Task<()>>,
     /// The program's title; empty while it names none.
@@ -157,6 +159,7 @@ impl TerminalView {
             blocks: Blocks::default(),
             notices: Notices::default(),
             flash: false,
+            pending: None,
             flashing: None,
             title: String::new(),
             front: true,
@@ -187,11 +190,6 @@ impl TerminalView {
     /// What programs in this terminal say they are doing.
     pub fn records(&self) -> &Records {
         &self.records
-    }
-
-    /// The commands its shell's marks divide its work into.
-    pub fn blocks(&self) -> &Blocks {
-        &self.blocks
     }
 
     /// The status its shell's last command ended with.
@@ -489,6 +487,7 @@ impl Render for TerminalView {
                     .into_any_element()
             }))
             .children(scrollbar::bar(span, &marks, window, cx))
+            .children(self.paste_card(cx).map(|card| card.into_any_element()))
             .children(
                 self.find_box(cx)
                     .map(|found| div().absolute().top_2().right_4().child(found)),
@@ -496,4 +495,5 @@ impl Render for TerminalView {
     }
 }
 
+mod blocks;
 mod busy;

@@ -16,6 +16,7 @@ mod marks;
 pub mod mouse;
 mod notify;
 mod paint;
+mod paste;
 mod pointer;
 mod prompts;
 mod pty;

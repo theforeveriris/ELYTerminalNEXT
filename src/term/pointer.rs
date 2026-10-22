@@ -424,7 +424,7 @@ impl TerminalView {
             log::debug!("terminal {}: no text to paste", self.pty.pid);
             return;
         };
-        self.paste_text(&text, cx);
+        self.offer_paste(&text, cx);
     }
 
     /// `text` to the program as a paste, bracketed when it asked.
