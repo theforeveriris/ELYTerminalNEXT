@@ -8,6 +8,7 @@ use futures::channel::mpsc::UnboundedSender;
 use polling::{Event, PollMode, Poller};
 
 use super::{
+    device::Scan,
     marks,
     notify::{self, Kitty},
     prompts::{self, Prompts},
@@ -25,6 +26,7 @@ pub(crate) struct Tapped<P> {
     scanner: Osc,
     modes: Modes,
     prompts: Prompts,
+    version: Scan,
     kitty: Kitty,
     titles: Titles,
     events: UnboundedSender<PtyEvent>,
@@ -39,6 +41,7 @@ impl<P> Tapped<P> {
             scanner: Osc::default(),
             modes: Modes::default(),
             prompts: Prompts::default(),
+            version: Scan::default(),
             kitty: Kitty::default(),
             titles: Titles::default(),
             events,
@@ -64,6 +67,12 @@ impl<P: EventedReadWrite> io::Read for Tapped<P> {
         let (kitty, titles) = (&mut self.kitty, &mut self.titles);
         self.scanner.feed(read, &mut |found| {
             report(found, events, pid, last, kitty, titles)
+        });
+        self.version.feed(read, &mut |query| {
+            log::debug!("pty {pid}: {query:?}");
+            if events.unbounded_send(PtyEvent::Device(query)).is_err() {
+                log::debug!("pty {pid}: a query after its session closed");
+            }
         });
         #[cfg(windows)]
         let win32 = self.modes.win32;

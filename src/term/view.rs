@@ -25,6 +25,7 @@ use gpui::{
 use super::{
     blocks::{Blocks, completion},
     click::Shell,
+    device,
     find::Finder,
     fonts::look,
     frame::frame,
@@ -187,6 +188,11 @@ impl TerminalView {
         self.pty.pid
     }
 
+    /// The modes the grid holds now, as DECRQM reads them.
+    fn term_mode(&self) -> TermMode {
+        *self.pty.term.lock().mode()
+    }
+
     /// What programs in this terminal say they are doing.
     pub fn records(&self) -> &Records {
         &self.records
@@ -314,6 +320,12 @@ impl TerminalView {
                     self.status(status);
                     self.restate(cx);
                 }
+                PtyEvent::Device(query) => {
+                    log::debug!("terminal {}: answers {query:?}", self.pty.pid);
+                    let mouse = self.mouse;
+                    self.pty
+                        .write(query.answer(self.term_mode(), mouse).into_bytes());
+                }
                 PtyEvent::Ask(ask) => {
                     self.ask(ask, cx);
                     self.restate(cx);
@@ -383,7 +395,11 @@ impl TerminalView {
                 let size = fit(self.size.0, self.size.1, self.cell);
                 self.pty.write(reply(size).into_bytes());
             }
-            Event::PtyWrite(text) => self.pty.write(text.into_bytes()),
+            Event::PtyWrite(text) => {
+                let mouse = self.mouse;
+                let honest = device::honest(&text, self.term_mode(), mouse);
+                self.pty.write(honest.unwrap_or(text).into_bytes());
+            }
             Event::ChildExit(status) => cx.emit(TerminalEvent::Exited(status)),
             Event::Exit => log::debug!("terminal {}: the grid closed", self.pty.pid),
         }

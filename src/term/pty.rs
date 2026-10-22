@@ -12,6 +12,7 @@ use alacritty_terminal::{
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender, unbounded};
 
 use super::{
+    device::Query,
     drop::{Quote, Target},
     marks::Mark,
     mouse::MouseMode,
@@ -30,6 +31,8 @@ pub enum PtyEvent {
     Mark(Mark),
     /// A program's status, OSC 7501.
     Status(Status),
+    /// What a program asked the terminal about itself: `CSI > 0 q`, XTVERSION.
+    Device(Query),
     /// A notification or progress, OSC 9, 777 or 99.
     Ask(Ask),
     /// A title a program set, in the output's order: OSC 0 or 2, or the title stack's pop.
