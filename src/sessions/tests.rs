@@ -40,6 +40,12 @@ fn a_row_notes_how_the_last_command_went() {
         started: start,
         command_at,
         ended,
+        command: None,
+        prompt_line: 0,
+        output_line: 0,
+        input_line: 0,
+        input_column: 0,
+        end_line: None,
     };
     let done = block(
         Phase::Done(Some(0)),

@@ -12,8 +12,24 @@ use super::{
     view::TerminalView,
 };
 
-actions!(elyterminal, [Find, FindNewer, PreviousPrompt, NextPrompt]);
+actions!(
+    elyterminal,
+    [
+        Find,
+        FindNewer,
+        PreviousPrompt,
+        NextPrompt,
+        PreviousBlock,
+        NextBlock,
+        PreviousFailed,
+        NextFailed,
+    ]
+);
 
+/// Copies the commands that ran as `name` says: "text", "markdown" or "json".
+#[derive(Clone, Debug, PartialEq, gpui::Action)]
+#[action(namespace = elyterminal, no_json)]
+pub struct ExportBlocks(pub String);
 /// The key context a terminal's root sets.
 pub const CONTEXT: &str = "Terminal";
 
@@ -55,6 +71,18 @@ pub fn bind_keys(cx: &mut App) {
             "shift-enter",
             FindNewer,
             Some(&format!("{FIND} > ElyInput")),
+        ),
+    ]);
+    // BLOCK-05: Ctrl/Cmd-Up and Down walk the commands that ran; with Alt, only those that failed.
+    cx.bind_keys([
+        KeyBinding::new("ctrl-alt-up", PreviousBlock, Some(CONTEXT)),
+        KeyBinding::new("ctrl-alt-down", NextBlock, Some(CONTEXT)),
+        KeyBinding::new("ctrl-shift-alt-up", PreviousFailed, Some(CONTEXT)),
+        KeyBinding::new("ctrl-shift-alt-down", NextFailed, Some(CONTEXT)),
+        KeyBinding::new(
+            "ctrl-shift-alt-e",
+            ExportBlocks("markdown".into()),
+            Some(CONTEXT),
         ),
     ]);
     cx.bind_keys(

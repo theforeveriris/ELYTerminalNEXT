@@ -16,20 +16,22 @@ use ely_gpui_component::{
     forms::{Copy, Paste, SelectAll},
     theme::ActiveTheme,
 };
-use futures::StreamExt;
 use gpui::{
     Bounds, Context, EventEmitter, ExternalPaths, FocusHandle, Focusable, IntoElement, MouseButton,
     ParentElement, Pixels, Render, Styled, Subscription, Task, Window, div, prelude::*, px,
 };
 
 use super::{
-    blocks::{Blocks, completion},
+    blocks::{self as block, Blocks, completion},
     click::Shell,
     find::Finder,
     fonts::look,
     frame::frame,
     ink::Ink,
-    input::{self, Find, Held, NextPrompt, PreviousPrompt},
+    input::{
+        self, ExportBlocks, Find, Held, NextBlock, NextFailed, NextPrompt, PreviousBlock,
+        PreviousFailed, PreviousPrompt,
+    },
     marks::Mark,
     mouse::MouseMode,
     paint,
@@ -90,6 +92,8 @@ pub struct TerminalView {
     pub(super) blocks: Blocks,
     /// The system notifications it posted.
     pub(super) notices: Notices,
+    /// The block a key stepped to, while it holds.
+    pub(super) block_at: Option<usize>,
     /// A bell rang and its flash is still seen.
     pub(super) flash: bool,
     /// A paste that waits for the user to let it go.
@@ -158,6 +162,7 @@ impl TerminalView {
             shell: Shell::Busy,
             blocks: Blocks::default(),
             notices: Notices::default(),
+            block_at: None,
             flash: false,
             pending: None,
             flashing: None,
@@ -202,51 +207,6 @@ impl TerminalView {
         self.front = front;
     }
 
-    fn pump(mut events: Events, cx: &mut Context<Self>) -> Task<()> {
-        cx.spawn(async move |view, cx| {
-            while let Some(first) = events.next().await {
-                let mut batch = vec![first];
-                while let Ok(more) = events.try_recv() {
-                    batch.push(more);
-                }
-                if view.update(cx, |view, cx| view.handle(batch, cx)).is_err() {
-                    break;
-                }
-            }
-        })
-    }
-
-    fn blink(cx: &mut Context<Self>) -> Task<()> {
-        cx.spawn(async move |view, cx| {
-            loop {
-                cx.background_executor().timer(BLINK).await;
-                let ticked = view.update(cx, |view, cx| {
-                    if view.blinking {
-                        view.shown = !view.shown;
-                        cx.notify();
-                    }
-                });
-                if ticked.is_err() {
-                    break;
-                }
-            }
-        })
-    }
-
-    /// Fits the grid to `columns` by `lines`; true when the size changed.
-    pub(super) fn fit(&mut self, columns: usize, lines: usize, cx: &mut Context<Self>) -> bool {
-        let fitted = fit(columns, lines, self.cell);
-        let size = (usize::from(fitted.num_cols), usize::from(fitted.num_lines));
-        if size == self.size {
-            return false;
-        }
-        self.size = size;
-        self.pty.resize(size, self.cell);
-        log::debug!("terminal {}: {} by {}", self.pty.pid, size.0, size.1);
-        self.search(false, cx);
-        true
-    }
-
     /// Tells a program that asked, by mode 1004, when the terminal gains or loses focus.
     fn refocus(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.active = window.is_window_active();
@@ -278,7 +238,6 @@ impl TerminalView {
         };
         self.post(body, None, cx);
     }
-
     fn handle(&mut self, events: Vec<PtyEvent>, cx: &mut Context<Self>) {
         let drawn = events
             .iter()
@@ -294,7 +253,8 @@ impl TerminalView {
                 #[cfg(windows)]
                 PtyEvent::Win32(on) => self.win32 = on,
                 PtyEvent::Mark(mark) => {
-                    self.blocks.mark(mark, Instant::now());
+                    let cell = self.cell();
+                    self.blocks.mark_at(mark, Instant::now(), cell);
                     match mark {
                         Mark::Done(status) => {
                             self.finished(status, cx);
@@ -306,7 +266,15 @@ impl TerminalView {
                             self.records.prompt();
                             self.restate(cx);
                         }
-                        Mark::Output => (self.ran, self.shell) = (true, Shell::Busy),
+                        Mark::Output => {
+                            self.ran = true;
+                            self.shell = Shell::Busy;
+                            // BLOCK-03: what was typed between the prompt and the command, kept.
+                            if let Some((prompt, from)) = self.blocks.typing_at() {
+                                let typed = self.typed(from);
+                                self.blocks.typed(typed, prompt);
+                            }
+                        }
                         Mark::Input => self.shell = self.shell.reads(),
                     }
                 }
@@ -454,6 +422,20 @@ impl Render for TerminalView {
                 cx.listener(|view, _: &PreviousPrompt, _, cx| view.scroll_to_prompt(true, cx)),
             )
             .on_action(cx.listener(|view, _: &NextPrompt, _, cx| view.scroll_to_prompt(false, cx)))
+            .on_action(
+                cx.listener(|view, _: &PreviousBlock, _, cx| view.step_block(false, false, cx)),
+            )
+            .on_action(cx.listener(|view, _: &NextBlock, _, cx| view.step_block(true, false, cx)))
+            .on_action(
+                cx.listener(|view, _: &PreviousFailed, _, cx| view.step_block(false, true, cx)),
+            )
+            .on_action(cx.listener(|view, _: &NextFailed, _, cx| view.step_block(true, true, cx)))
+            .on_action(cx.listener(
+                |view, export: &ExportBlocks, _, cx| match block::export_named(&export.0) {
+                    Some(format) => view.export_blocks(format, cx),
+                    None => log::warn!("terminal: no export called {:?}", export.0),
+                },
+            ))
             .on_any_mouse_down(cx.listener(Self::mouse_down))
             .on_mouse_move(cx.listener(Self::mouse_move))
             .on_scroll_wheel(cx.listener(Self::wheel))
@@ -514,3 +496,4 @@ impl Render for TerminalView {
 mod blocks;
 mod busy;
 mod protocol;
+mod ticker;
