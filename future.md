@@ -122,6 +122,10 @@
 - **SEC-04**：OSC 8 目标与行内识别出的 URL 只在 http / https / mailto / file 下可点；`javascript:`、`data:` 与不认识的 scheme 一律不打开。见 `src/term/links.rs`。
 - **PROTO-01 / 02 / 03**：DA1 按真实能力回答 `62;22`（VT220 + ANSI 颜色），不报 sixel 的 4 与 ReGIS 的 3；XTVERSION 由 tap 读取（vte 不派发它）并回答 `ELYTerminal(版本)`；DECRQM 按网格模式与鼠标模式回答，已知但不设置的答 4，不认识的答 0。见 `src/term/device.rs`。
 - **SHELL-13**：启动失败时保留程序与参数、目录、错误及其成因，以及程序自己写下的前 8 行；窗口里显示这份报告并带一个复制按钮，日志里也记一份。见 `src/term/pty.rs` 的 `Failed` 与 `src/workspace.rs`。
+- **PATH-08 / PANEL-09**：文件面板的复制按钮展开一份菜单，路径可按系统写法、Git Bash 写法、WSL 写法、加引号或 `file:` URI 复制；shell 会特别解读的字符被转义而不是丢弃。见 `src/location.rs` 的 `written`。
+- **CFG-06**：`shell`、`editor`、`start_in_folder` 与 `last_folder` 里的 `${VAR}` 从环境变量展开一次，不执行任何命令；变量没有取值时报错并点名该变量。见 `src/settings/store.rs` 的 `expand`。
+- **TAB-13**：`Ctrl/Cmd-Shift-K` 把当前会话克隆到一个新标签，用同样的程序与环境变量、在它最后报告的目录里启动；回滚缓冲与运行状态不跟随。见 `src/workspace/tabs.rs` 的 `clone_of`。
+- **CFG-16**：既无 `config.toml` 也无 `settings.json` 时，首次运行写出一份 `config.toml`，每个字段上方一行注释说明它设置什么、可选值有哪些；已存在的文件绝不被覆盖。见 `src/settings/mod.rs` 的 `commented`。
 
 ---
 

@@ -383,3 +383,22 @@ Progress truth. Top to bottom, one at a time. A task is ticked only after its co
 - [x] T70 A session that will not start says why, and what to copy, as SHELL-13 asks: a failed start keeps the program and its arguments, the folder, the error with its causes, and the first eight lines the program wrote itself, and shows them in the window with a Copy button; the words go to the log too.
 
   - 无法启动的会话会说明原因，并给出可复制的内容，这是 SHELL-13 所要求的：启动失败时保留程序与参数、目录、错误及其成因，以及程序自己写下的前八行，在窗口中显示并带一个复制按钮；这些文字也记入日志。
+
+## 35. Paths, settings and a tab of its own
+## 35. 路径、设置与一个属于自己的标签
+
+- [x] T71 A path is copied in the form the user names, as PATH-08 and PANEL-09 ask: the Files panel's copy button opens a menu with the path as the system writes it, as Git Bash reads it, as WSL reads it, quoted for a shell, or as a file URI; what a shell reads specially is escaped rather than dropped.
+
+  - 路径以用户指定的形式被复制，这是 PATH-08 与 PANEL-09 所要求的：文件面板的复制按钮展开一份菜单，路径可按系统的写法、Git Bash 的写法、WSL 的写法、加引号后给 shell、或作为 file URI 复制；shell 会特别解读的字符被转义而非丢弃。
+
+- [x] T72 A settings file may name a variable the environment holds, as CFG-06 asks: `${VAR}` expands once in the shell, editor, start-in and last-folder settings, read from the environment and never from a command; a variable with no value fails the load and names itself.
+
+  - 设置文件可以写出环境变量的名字，这是 CFG-06 所要求的：`${VAR}` 在 shell、editor、start_in_folder 与 last_folder 中展开一次，只从环境变量读取，绝不执行命令；没有取值的变量使读取失败并点名自己。
+
+- [x] T73 A session opens again in a tab of its own, in the folder it was last in, as TAB-13 asks: Ctrl-Shift-K, or Cmd-Shift-K on macOS, clones the shown session with the same program and variables in the folder it last reported, and no scrollback or running state comes with it.
+
+  - 会话可以在一个属于自己的标签里再次打开，并落在它最后所在的目录，这是 TAB-13 所要求的：Ctrl-Shift-K，macOS 上为 Cmd-Shift-K，以同样的程序与环境变量在会话最后报告的目录里克隆它，回滚缓冲与运行状态都不跟随。
+
+- [x] T74 A first run writes a config file that says what each field sets, as CFG-16 asks: with neither `config.toml` nor `settings.json` there, the app writes a `config.toml` of the defaults, each field under a comment naming what it sets and what else it could be; an existing file is never overwritten.
+
+  - 首次运行写出一份能说明每个字段设置什么的配置文件，这是 CFG-16 所要求的：在既无 `config.toml` 也无 `settings.json` 时，应用写出一份填入默认值的 `config.toml`，每个字段上方一行注释写明它设置什么以及还能取什么值；已存在的文件绝不被覆盖。
