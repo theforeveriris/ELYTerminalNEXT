@@ -28,6 +28,7 @@ mod rename;
 mod restore;
 mod status;
 mod tabs;
+mod title;
 mod view;
 mod widths;
 
@@ -327,7 +328,7 @@ impl Workspace {
             self.zoom = Some(id);
         }
         log::debug!("app: session {id} shown");
-        self.retitle(window);
+        self.retitle(window, cx);
         self.save_soon(cx);
         cx.notify();
     }

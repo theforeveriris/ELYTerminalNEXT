@@ -1,6 +1,6 @@
 //! The tabs of the window and the panes in them.
 
-use gpui::{AppContext, Context, PromptLevel, Window};
+use gpui::{App, AppContext, Context, PromptLevel, Window};
 
 use super::layout::{Direction, SessionId, Tab};
 use super::{TITLE, Workspace};
@@ -485,11 +485,11 @@ impl Workspace {
         self.session(self.active).map_or(TITLE, Session::named)
     }
 
-    pub(super) fn retitle(&self, window: &mut Window) {
-        let title = self.title();
-        if window.window_title() != title {
-            log::debug!("app: the title is {title:?}");
-            window.set_window_title(title);
+    pub(super) fn retitle(&self, window: &mut Window, cx: &App) {
+        let composed = self.window_title(cx);
+        if window.window_title() != composed {
+            log::debug!("app: the title is {composed:?}");
+            window.set_window_title(&composed);
         }
     }
 }

@@ -26,6 +26,7 @@ mod custom;
 mod general;
 mod preview;
 mod terminal;
+mod text;
 mod theme_import;
 mod themegrid;
 
@@ -100,6 +101,8 @@ pub struct SettingsWindow {
     shell: Entity<TextInput>,
     /// The command files open in.
     editor: Entity<TextInput>,
+    /// The template the window's title is composed from.
+    window_title: Entity<TextInput>,
     /// The start folder a fixed start reads.
     start_folder: Entity<TextInput>,
     /// The shortcut list's search.
@@ -122,6 +125,7 @@ pub struct SettingsWindow {
     _typed: Subscription,
     _start: Subscription,
     _editor: Subscription,
+    _title: Subscription,
     _settings: Subscription,
     _updates: Subscription,
     _blink: Task<()>,
@@ -153,23 +157,23 @@ impl SettingsWindow {
             input.set_text(SettingsStore::get(cx).start_in_folder.clone(), cx);
             input
         });
-        let editor = cx.new(|cx| {
-            let mut input = TextInput::new(window, cx)
-                .placeholder(language::message(cx, "settings.terminal.editor.hint"));
-            input.set_text(SettingsStore::get(cx).editor.clone(), cx);
-            input
-        });
-        let editor_typed = cx.subscribe(&editor, |this, input, event: &InputEvent, cx| {
-            if let InputEvent::Changed = event {
-                let command = input.read(cx).text().to_string();
-                if let Err(error) =
-                    SettingsStore::update(cx, |settings| settings.editor = command.clone())
-                {
-                    log::debug!("settings: the editor stays: {error:#}");
-                }
-                this.paged(cx);
-            }
-        });
+        let (editor, editor_typed) = text::field(
+            window,
+            cx,
+            "editor",
+            language::message(cx, "settings.terminal.editor.hint"),
+            SettingsStore::get(cx).editor.clone(),
+            |settings, text| settings.editor = text,
+        );
+        let (window_title, title_typed) = text::field(
+            window,
+            cx,
+            "window_title",
+            crate::settings::title::DEFAULT.to_string(),
+            SettingsStore::get(cx).window_title.clone(),
+            |settings, text| settings.window_title = text,
+        );
+
         let font = cx.new(|cx| TextInput::new(window, cx));
         let search = cx.new(|cx| {
             TextInput::new(window, cx)
@@ -201,6 +205,7 @@ impl SettingsWindow {
             shell,
             start_folder,
             editor,
+            window_title,
             search,
             refused: None,
             failed: None,
@@ -213,6 +218,7 @@ impl SettingsWindow {
             _typed: typed,
             _start: start_typed,
             _editor: editor_typed,
+            _title: title_typed,
             _settings: cx.observe_global_in::<SettingsStore>(window, |this, window, cx| {
                 this.grow_fallbacks(window, cx);
                 this.paged(cx);

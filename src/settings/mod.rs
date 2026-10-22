@@ -2,6 +2,7 @@ mod include;
 pub mod language;
 mod seed;
 pub(crate) mod store;
+pub mod title;
 pub mod window;
 mod write;
 
@@ -115,6 +116,8 @@ pub struct Settings {
     pub ely_left: f32,
     /// A check for a newer release at start and once a day.
     pub check_updates: bool,
+    /// The window's title: {title}, {cwd} and {shell} stand for the session's name, its folder and its program.
+    pub window_title: String,
     pub show_sessions: bool,
     pub show_panel: bool,
     pub panel: PanelTab,
@@ -171,6 +174,7 @@ impl Default for Settings {
             ely: true,
             ely_left: 140.0,
             check_updates: true,
+            window_title: title::DEFAULT.into(),
             show_sessions: true,
             show_panel: true,
             panel: PanelTab::Git,

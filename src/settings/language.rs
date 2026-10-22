@@ -121,6 +121,11 @@ const EN: &[(&str, &str)] = &[
     ),
     ("settings.terminal.restore", "Reopen last time's tabs"),
     ("settings.terminal.editor", "Editor"),
+    ("settings.terminal.title", "Window title"),
+    (
+        "settings.terminal.title.hint",
+        "{title}, {cwd} and {shell} stand for the session, its folder and its program",
+    ),
     (
         "settings.terminal.editor.hint",
         "Opens files from the panel; empty opens them with the system",
@@ -221,6 +226,11 @@ const ZH: &[(&str, &str)] = &[
     (
         "settings.terminal.editor.hint",
         "从文件面板打开文件；留空则交给系统默认程序",
+    ),
+    ("settings.terminal.title", "窗口标题"),
+    (
+        "settings.terminal.title.hint",
+        "{title}、{cwd}、{shell} 分别代表会话名、目录与程序",
     ),
     ("settings.terminal.scrollback", "回滚行数"),
     ("settings.terminal.option", "Option 视作 Alt"),

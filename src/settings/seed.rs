@@ -263,6 +263,12 @@ pub fn commented(settings: &Settings) -> String {
         "check_updates",
         b(settings.check_updates).into(),
     );
+    field(
+        &mut out,
+        "The window's title: {title}, {cwd} and {shell} stand for the session, its folder and its program.",
+        "window_title",
+        q(&settings.window_title),
+    );
     out
 }
 

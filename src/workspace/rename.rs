@@ -73,7 +73,7 @@ impl Workspace {
         if held && let Some(shown) = self.session(self.active) {
             window.focus(&shown.terminal.focus_handle(cx), cx);
         }
-        self.retitle(window);
+        self.retitle(window, cx);
         cx.notify();
     }
 }

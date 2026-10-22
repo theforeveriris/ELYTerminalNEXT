@@ -158,6 +158,11 @@ impl SettingsWindow {
                     .control(editor),
             )
             .row(
+                SettingsRow::new(language::message(cx, "settings.terminal.title"))
+                    .description(language::message(cx, "settings.terminal.title.hint"))
+                    .control(PathInput::new("settings-window-title", &self.window_title)),
+            )
+            .row(
                 SettingsRow::new(language::message(cx, "settings.terminal.scrollback"))
                     .control(lines),
             );
