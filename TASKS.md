@@ -449,3 +449,10 @@ Progress truth. Top to bottom, one at a time. A task is ticked only after its co
 - [x] T82 A program cannot fill the clipboard, and a session names the commands that failed, as SEL-08, STAT-19, FIND-08 and INP-14 ask: an OSC 52 write over 100 KiB is refused and logged, since a program writes without asking; a session's hover names the commands that failed in it, one by its own line and several by count; the settings' shortcut list carries every key this fork adds, and Ctrl-Shift-/ opens it.
 
   - 程序不能把剪贴板填满，而会话会点名失败过的命令，这是 SEL-08、STAT-19、FIND-08 与 INP-14 所要求的：OSC 52 写入超过 100 KiB 时整条拒绝并记日志，因为程序写入时并不询问；会话的悬停点名其中失败过的命令，一条时直接写出，多条时给出条数；设置的快捷键表收录了本 fork 新增的每个按键，Ctrl-Shift-/ 可打开它。
+
+## 41. The window's title
+## 41. 窗口标题
+
+- [x] T83 The window's title is a template the user writes, as UI-17 asks: `{title}`, `{cwd}` and `{shell}` stand for the session's name, its folder as the sessions column writes it and its program's name, and a template that names none of them falls back to the session's name; Settings › Terminal carries the field, and the seeded `config.toml` explains the variables.
+
+  - 窗口标题是用户自己写的模板，这是 UI-17 所要求的：`{title}`、`{cwd}`、`{shell}` 分别代表会话名、按会话栏写法显示的目录、以及程序名，一个变量都不含时退回会话名；设置 › Terminal 有对应输入框，种子 `config.toml` 里说明了这几个变量。
