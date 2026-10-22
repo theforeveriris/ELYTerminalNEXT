@@ -240,6 +240,35 @@ impl Workspace {
         self.show_tab(window, cx);
     }
 
+    /// Moves the shown tab one place up or down in the column, keeping the pinned ones first.
+    pub fn move_tab(&mut self, up: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let at = self.active_tab;
+        let by = if up { -1 } else { 1 };
+        if !Tab::move_by(&mut self.tabs, at, by) {
+            log::debug!("app: tab {} stays where it is", at + 1);
+            return;
+        }
+        self.active_tab = at.checked_add_signed(by).unwrap_or(at);
+        log::info!("app: tab {} moves to {}", at + 1, self.active_tab + 1);
+        self.show_tab(window, cx);
+    }
+
+    /// Pins the shown tab, or unpins it; a pinned tab sits before the rest and does not move.
+    pub fn toggle_pin(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let at = self.active_tab;
+        let pinned = self.tabs.get(at).is_some_and(|tab| tab.pinned);
+        let Some(to) = Tab::pin(&mut self.tabs, at, !pinned) else {
+            return;
+        };
+        self.active_tab = to;
+        log::info!(
+            "app: tab {} is {}",
+            to + 1,
+            if pinned { "unpinned" } else { "pinned" }
+        );
+        self.show_tab(window, cx);
+    }
+
     /// Shows the tab at `index`.
     pub fn select_tab(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
         if index >= self.tabs.len() {

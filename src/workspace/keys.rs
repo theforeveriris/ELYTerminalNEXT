@@ -5,9 +5,9 @@ use gpui::{App, KeyBinding};
 use super::layout::Direction;
 use super::{
     CONTEXT, CheckHealth, CloneSession, ClosePane, CloseSession, CloseTab, EvenPanes, FocusPane,
-    LastSession, LastTab, NewSession, NewTab, NextSession, NextTab, NextUsed, PreviousSession,
-    PreviousTab, PreviousUsed, SelectSession, SelectTab, SplitDown, SplitRight, SwapPane,
-    TogglePanel, ToggleSessions, Zen, ZoomPane,
+    LastSession, LastTab, MoveTabDown, MoveTabUp, NewSession, NewTab, NextSession, NextTab,
+    NextUsed, PinTab, PreviousSession, PreviousTab, PreviousUsed, SelectSession, SelectTab,
+    SplitDown, SplitRight, SwapPane, TogglePanel, ToggleSessions, Zen, ZoomPane,
 };
 
 /// Binds every key the workspace answers: Ghostty's, and the ones this fork adds beside them.
@@ -68,6 +68,10 @@ pub fn bind(cx: &mut App) {
         KeyBinding::new(tab_clone, CloneSession, context),
         KeyBinding::new("ctrl-shift-alt-h", CheckHealth, context),
         KeyBinding::new("ctrl-shift-alt-e", EvenPanes, context),
+        // TAB-03 and TAB-04: the tab moves among its neighbours, or stays where it is for good.
+        KeyBinding::new("ctrl-shift-alt-up", MoveTabUp, context),
+        KeyBinding::new("ctrl-shift-alt-down", MoveTabDown, context),
+        KeyBinding::new("ctrl-shift-alt-p", PinTab, context),
     ]);
     cx.bind_keys([
         KeyBinding::new(new, NewSession, context),

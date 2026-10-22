@@ -20,9 +20,9 @@ use gpui::{
 
 use super::{
     CONTEXT, CloneSession, ClosePane, CloseSession, CloseTab, EvenPanes, FocusPane, LastSession,
-    LastTab, NewSession, NewTab, NextSession, NextTab, NextUsed, PreviousSession, PreviousTab,
-    PreviousUsed, SelectSession, SelectTab, Side, SplitDown, SplitRight, SwapPane, TogglePanel,
-    ToggleSessions, Workspace, Zen, ZoomPane, badge, status,
+    LastTab, MoveTabDown, MoveTabUp, NewSession, NewTab, NextSession, NextTab, NextUsed, PinTab,
+    PreviousSession, PreviousTab, PreviousUsed, SelectSession, SelectTab, Side, SplitDown,
+    SplitRight, SwapPane, TogglePanel, ToggleSessions, Workspace, Zen, ZoomPane, badge, status,
 };
 use crate::menus;
 use crate::sessions::{self, Session};
@@ -67,14 +67,16 @@ impl Workspace {
             let close = workspace.clone();
             // A tab names its own sessions, so it shows how many it holds.
             let count = tab.panes.len();
+            let badge = match (tab.pinned, count > 1) {
+                (true, true) => format!("\u{2605} {count}"),
+                (true, false) => "\u{2605}".to_string(),
+                (false, true) => format!("{count}"),
+                (false, false) => String::new(),
+            };
             let tab_row = ListItem::new(("tab", at), title)
                 .selected(shown)
                 .strong(shown)
-                .detail(if count > 1 {
-                    format!("{count}")
-                } else {
-                    String::new()
-                })
+                .detail(badge)
                 .on_click(move |_, window, cx| {
                     select.update(cx, |this, cx| this.select_tab(at, window, cx))
                 })
@@ -438,6 +440,13 @@ impl Render for Workspace {
                 let focused = this.tab().map_or(0, |tab| tab.focused);
                 this.even_panes(focused, cx)
             }))
+            .on_action(
+                cx.listener(|this, _: &MoveTabUp, window, cx| this.move_tab(true, window, cx)),
+            )
+            .on_action(
+                cx.listener(|this, _: &MoveTabDown, window, cx| this.move_tab(false, window, cx)),
+            )
+            .on_action(cx.listener(|this, _: &PinTab, window, cx| this.toggle_pin(window, cx)))
             .on_action(cx.listener(|this, focus: &FocusPane, window, cx| {
                 this.focus_pane(focus.0, window, cx)
             }))

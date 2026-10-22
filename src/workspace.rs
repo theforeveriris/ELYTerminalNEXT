@@ -60,7 +60,10 @@ actions!(
         Zen,
         CloneSession,
         CheckHealth,
-        EvenPanes
+        EvenPanes,
+        MoveTabUp,
+        MoveTabDown,
+        PinTab
     ]
 );
 
