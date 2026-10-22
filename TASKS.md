@@ -424,3 +424,10 @@ Progress truth. Top to bottom, one at a time. A task is ticked only after its co
 - [x] T78 A settings file may build on the files it names, as CFG-05 asks: `config.toml` names others with `include`, one or a list, each relative to itself; they are laid over one another first and the file's own fields go over theirs, so shared settings live in one place and a project's file says only what it changes; a loop stops at a file already read, and a missing one names the file that asked for it.
 
   - 设置文件可以建立在它点名的文件之上，这是 CFG-05 所要求的：`config.toml` 用 `include`（一个名字或一列名字，相对自身路径）点名其他文件；它们先互相叠放，本文件自己的字段再压在上面，所以公共设置只写一处、项目文件只写改动；成环时遇到已读过的文件就停，缺失的文件报错时点名是哪个文件要它。
+
+## 38. What this machine came to
+## 38. 这台机器的状况
+
+- [x] T79 The terminal can say what it found of this machine, on demand: Ctrl-Shift-Alt-H reads the settings file as a fresh start would, counts the four shell integration scripts, and asks each shell the scan found whether it still stands where it stood; the report shows over the terminal, one finding a line, a dash for what stands and a bang for a fault, and goes to the log as well.
+
+  - 终端可以按需说明它在这台机器上找到了什么：Ctrl-Shift-Alt-H 像一次全新启动那样读取设置文件、数一数四份 shell 集成脚本、逐个询问扫描到的 shell 是否仍在原处；报告叠在终端上，一行一条，`-` 表示正常、`!` 表示有问题，同时也写入日志。

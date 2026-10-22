@@ -132,6 +132,7 @@
 - **STAT-17**：终端列标题显示会话所在目录的 Git 分支，读最近的 `.git/HEAD` 或 worktree 的 gitfile；不在工作树里或处于游离 HEAD 时不显示。见 `src/workspace/badge.rs`。
 - **STAT-14 / CONN-18**：终端下方一行显示会话所在的连接（`WSL: archlinux`、`ssh: host`）、网格的列数与行数、以及所在分支；会话行在非本机时以连接开头。见 `src/workspace/status.rs` 与 `src/sessions.rs` 的 `connection`。
 - **CFG-05**：`config.toml` 可用 `include`（一个名字或一列名字，相对自身路径）分成多份；被点名的文件先互相叠放，本文件自己的字段再压在上面，所以公共设置只写一处、项目文件只写改动；互相引用成环时遇到已读过的文件就停，缺失的文件报错时点名是哪个文件要它。见 `src/settings/include.rs`。
+- **健康检查（future.md §8 第 20 条）**：`Ctrl-Shift-Alt-H` 按一次就能看到这台机器的状况：设置文件能否读出（含未知字段）、四份 shell 集成脚本是否齐全、扫描到的每个 shell 是否仍在原处，报告叠在终端上、一行一条，`-` 表示正常、`!` 表示有问题，同时写入日志。见 `src/health.rs` 与 `src/workspace/health.rs`。
 
 ---
 
