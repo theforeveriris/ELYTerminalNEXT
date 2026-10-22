@@ -322,7 +322,7 @@ pub fn plain(text: &str) -> String {
 }
 
 /// C1 controls, direction controls and invisible formatting; joiners stay, as scripts and emoji need them.
-fn invisible(c: char) -> bool {
+pub fn invisible(c: char) -> bool {
     matches!(
         c,
         '\u{80}'..='\u{9f}'

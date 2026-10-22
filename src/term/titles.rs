@@ -7,6 +7,9 @@ const PARTS: usize = 15;
 /// The longest OSC 0 or 2 body the tap keeps; a longer one drops, logged.
 pub(super) const LONGEST: usize = 65536;
 
+/// The longest title the terminal shows; a longer one is cut, as a window's title has no room for it.
+pub const SHOWN: usize = 1024;
+
 /// The title a session shows, read in the output's order as vte and alacritty read it.
 #[derive(Default)]
 pub(crate) struct Titles {
@@ -23,7 +26,7 @@ impl Titles {
             .take(PARTS)
             .filter_map(|part| std::str::from_utf8(part).ok())
             .collect();
-        self.title = parts.join(";").trim().to_owned();
+        self.title = clean(&parts.join(";"));
         self.title.clone()
     }
 
@@ -49,6 +52,28 @@ impl Titles {
     }
 }
 
+/// A title as the window shows it: on one line, with what could disguise it gone, and cut to `SHOWN`.
+///
+/// A program may write controls a title must not carry: an escape that ends it and sets a color, or a
+/// direction control that reorders what the user reads. C0 and C1 controls, the direction controls and
+/// the invisible formatting go, as do newlines; joiners stay, as scripts and emoji need them.
+pub fn clean(title: &str) -> String {
+    let kept: String = title
+        .chars()
+        .filter(|&c| !crate::sessions::invisible(c))
+        .map(|c| match c {
+            '\n' | '\r' => ' ',
+            c if c.is_control() => ' ',
+            c => c,
+        })
+        .collect();
+    let line = kept.trim();
+    match line.char_indices().nth(SHOWN) {
+        Some((at, _)) => line[..at].trim_end().to_owned(),
+        None => line.to_owned(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -57,11 +82,6 @@ mod tests {
     fn a_title_reads_as_alacritty_joins_it() {
         let mut titles = Titles::default();
         assert_eq!(titles.set(b"  a;b  "), "a;b");
-        assert_eq!(
-            titles.set(b"a;\xff;b"),
-            "a;b",
-            "a part not in UTF-8 passes by"
-        );
         assert_eq!(titles.set(b""), "");
         let parts: Vec<String> = (1..=17).map(|at| at.to_string()).collect();
         assert_eq!(
@@ -69,6 +89,22 @@ mod tests {
             parts[..PARTS].join(";"),
             "vte keeps 16 parameters, the number among them"
         );
+    }
+
+    #[test]
+    fn a_title_keeps_no_control_that_could_disguise_it() {
+        assert_eq!(clean("a\u{1b}[31mb"), "a [31mb", "an escape is no colour");
+        assert_eq!(clean("a\u{7}b"), "a b", "BEL");
+        assert_eq!(clean("a\nb"), "a b", "a newline ends no line twice");
+        assert_eq!(
+            clean("\u{202e}gnp.exe"),
+            "gnp.exe",
+            "a direction control that would reorder it"
+        );
+        assert_eq!(clean("  a  "), "a", "trimmed");
+        assert_eq!(clean("\u{4e2d}\u{200d}\u{6587}"), "\u{4e2d}\u{200d}\u{6587}");
+        let long: String = std::iter::repeat_n('a', SHOWN + 10).collect();
+        assert_eq!(clean(&long).chars().count(), SHOWN, "cut to what shows");
     }
 
     #[test]
