@@ -1,12 +1,8 @@
-//! The line under the terminal that says what it runs as: where the session sits, and its size.
+//! The line under the terminal says what it runs as: where the session sits, its size and its branch.
 
 use super::badge::Branch;
 
-/// What the status line says of the session `id`, at `size` cells: where it sits, its size, and the
-/// branch of the folder it is in.
-///
-/// The connection comes first, because it is what a user needs before they read a command's
-/// output; the size is there for a program that draws to it; the branch last, when there is one.
+/// What the status line says of the session `id`, at `size` cells: where it sits, its size, and the branch of the folder it is in. The connection comes first, because it is what a user needs before they read a command's output; the size is there for a program that draws to it; the branch last, when there is one.
 pub(super) fn of(session: Option<&crate::sessions::Session>, size: (i32, i32)) -> String {
     let mut parts = Vec::new();
     let Some(session) = session else {

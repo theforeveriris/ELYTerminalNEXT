@@ -18,10 +18,7 @@ pub enum Query {
 /// The name XTVERSION answers with.
 pub const NAME: &str = "ELYTerminal";
 
-/// The parameters DA1 answers with: 62 for VT220, 22 for ANSI colour.
-///
-/// Sixel is 4 and ReGIS is 3, and neither is here: the terminal draws no graphics of its own, so a
-/// program that asks never tries to send one.
+/// The parameters DA1 answers with: 62 for VT220, 22 for ANSI colour. Sixel is 4 and ReGIS is 3, and neither is here, since the terminal draws no graphics of its own and a program that asks never tries to send one.
 const PRIMARY: &str = "62;22";
 
 /// What DECRQM says of a mode it knows but never sets: 4, permanently reset.
@@ -138,11 +135,7 @@ fn state(mode: u32, term: TermMode, mouse: MouseMode) -> u8 {
     }
 }
 
-/// The reply to `CSI c`, `CSI ? Ps $ p` or `CSI > 0 q` the grid handed `reply`, honestly said.
-///
-/// The grid answers a device attributes query as VT102, and a mode query from a table that holds
-/// almost nothing of what this terminal does; both would have a program take it for less than it is.
-/// Their replies are the only `?…c` and `…$y` the grid writes, so each is read back and answered again.
+/// The reply to `CSI c`, `CSI ? Ps $ p` or `CSI > 0 q` the grid handed `reply`, honestly said. The grid answers a device attributes query as VT102 and a mode query from a table that holds almost nothing of what this terminal does, so a program that asks would take it for less than it is; their replies are the only `?…c` and `…$y` the grid writes, so each is read back and answered again.
 pub fn honest(reply: &str, term: TermMode, mouse: MouseMode) -> Option<String> {
     let rest = reply.strip_prefix("\x1b[?")?;
     let query = match rest.strip_suffix('c') {

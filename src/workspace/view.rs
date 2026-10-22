@@ -292,8 +292,7 @@ impl Render for Workspace {
         let mut terminal = ShellColumn::new("terminal")
             .title(self.title().to_string())
             .child(self.panes());
-        // STAT-14: a line under the terminal says where the session sits, its size and its branch.
-        // Its cells are read here, before the pane is drawn, from the grid the session holds.
+        // STAT-14: a line under the terminal says where the session sits, its size and its branch. Its cells are read here, before the pane is drawn, from the grid the session holds.
         let cells = self
             .session(self.active)
             .map(|session| {

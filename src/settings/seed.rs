@@ -1,16 +1,8 @@
-﻿//! The `config.toml` a first run writes: the defaults, each field under a comment.
-//!
-//! The file the settings window writes holds every field and no comments. The one a first run
-//! writes should be one the user can read, so each field goes down by hand under a line that says
-//! what it sets and, where it takes a few values, what they are.
+﻿//! The `config.toml` a first run writes: the defaults, each field under a comment saying what it sets.
 
 use super::Settings;
 
-/// `settings` as a `config.toml`, with a comment over each field saying what it sets.
-///
-/// The file the settings window writes holds every field and no comments; the one a first run writes
-/// should be one the user can read, so each field is written by hand under a line that says what it
-/// does and, where it takes a few values, what they are.
+/// `settings` as a `config.toml`, with a comment over each field saying what it sets. The file the settings window writes holds every field and no comments; the one a first run writes should be one the user can read, so each field goes down by hand under a line that says what it does and, where it takes a few values, what they are.
 pub fn commented(settings: &Settings) -> String {
     let d = |value: f32| format!("{value}");
     let b = |value: bool| if value { "true" } else { "false" };

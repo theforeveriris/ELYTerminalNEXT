@@ -19,10 +19,7 @@ impl TerminalView {
         &self.blocks
     }
 
-    /// Walks to the next command that ended, or the previous one, and scrolls it into view.
-    ///
-    /// A command's prompt line is where a key lands, so the command and what it printed follow it.
-    /// With `failed`, only the commands that failed are walked: the ones worth a second look.
+    /// Walks to the next command that ended, or the previous one, and scrolls it into view. A command's prompt line is where a key lands, so the command and what it printed follow it; with `failed`, only the commands that failed are walked, the ones worth a second look.
     pub(super) fn step_block(&mut self, newer: bool, failed: bool, cx: &mut Context<Self>) {
         let Some(at) = self.blocks.step(self.block_at, newer, failed) else {
             return;
@@ -62,11 +59,7 @@ impl TerminalView {
         }
     }
 
-    /// The line typed since the prompt ended, from the first cell of the input to the cursor.
-    ///
-    /// The shell's `OSC 133 B` says where its prompt left off and the cursor where the typed line
-    /// ends, so the text between them is what the user wrote — across soft wraps too. A program
-    /// that redrew the line leaves its own marks; nothing here pretends otherwise.
+    /// The line typed since the prompt ended, from the first cell of the input to the cursor. The shell's `OSC 133 B` says where its prompt left off and the cursor where the typed line ends, so the text between them is what the user wrote, across soft wraps too.
     pub(super) fn typed(&self, from: At) -> String {
         let term = self.pty.term.lock();
         let grid = term.grid();

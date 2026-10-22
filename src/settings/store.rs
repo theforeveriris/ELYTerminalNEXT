@@ -2,7 +2,6 @@ use std::{
     fs,
     io::{ErrorKind, Write},
     path::{Path, PathBuf},
-    sync::atomic::{AtomicU64, Ordering},
     time::SystemTime,
 };
 
@@ -10,6 +9,7 @@ use anyhow::Context as _;
 use gpui::{App, Global};
 
 use super::Settings;
+use super::write::{is_toml, save};
 
 /// The settings in force and the file they live in; the only writer of that file.
 pub struct SettingsStore {
@@ -22,15 +22,13 @@ pub struct SettingsStore {
 impl Global for SettingsStore {}
 
 impl SettingsStore {
-    /// Loads `config.toml`, or `settings.json` when there is no TOML, into the app; the first run
-    /// writes a `config.toml` of its own, each field with a comment saying what it does.
+    /// Loads `config.toml`, or `settings.json` when there is no TOML, into the app; a first run writes a `config.toml` of its own, each field with a comment saying what it does.
     pub fn init(cx: &mut App) -> anyhow::Result<()> {
         let folder = dirs::config_dir().context("settings: the platform names no config folder")?;
         let base = folder.join("ELYTerminal");
         let toml = base.join("config.toml");
         let json = base.join("settings.json");
-        // CFG-16: the first run writes a config.toml of its own, each field under a comment saying
-        // what it sets, so the file the user finds is one they can read and change.
+        // CFG-16: the first run writes a config.toml of its own, each field under a comment saying what it sets, so the file the user finds is one they can read and change.
         let path = if !toml.exists() && !json.exists() {
             seeded(&toml)?;
             toml
@@ -126,11 +124,7 @@ fn fonts(settings: &Settings, cx: &App) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Writes `path`, a `config.toml` of the defaults with a comment over each field, when it is not there.
-///
-/// A settings file found on the first run is one the user did not write and cannot read. This one
-/// says what each field sets and what else it could be, so the file is the documentation for the
-/// settings the window shows. An existing file is never overwritten: a user's own is theirs.
+/// Writes `path`, a `config.toml` of the defaults with a comment over each field, when it is not there. A settings file found on the first run is one the user did not write and cannot read, so this one says what each field sets and what else it could be; an existing file is never overwritten, because a user's own is theirs.
 pub fn seeded(path: &Path) -> anyhow::Result<()> {
     let settings = Settings::default();
     let lines = crate::settings::commented(&settings);
@@ -200,11 +194,7 @@ pub fn load_any(path: &Path) -> anyhow::Result<Settings> {
     }
 }
 
-/// Expands `${VAR}` in `text`, once, from the environment; one with no value is an error.
-///
-/// A path in a settings file is the same on every machine but the user's name and home, so those
-/// come from the environment. No substitution runs a command: this reads a variable's value, and
-/// a variable the environment does not hold names itself in the error.
+/// Expands `${VAR}` in `text`, once, from the environment; one with no value is an error. A path in a settings file is the same on every machine but the user's name and home, so those come from the environment; no substitution runs a command, only reads a variable, and one the environment does not hold names itself in the error.
 pub fn expand(text: &str) -> anyhow::Result<String> {
     let mut out = String::with_capacity(text.len());
     let mut rest = text;
@@ -286,58 +276,6 @@ fn warn_extra(settings: &Settings, path: &Path) {
         );
     }
 }
-
-/// Whether `path` names a TOML file.
-fn is_toml(path: &Path) -> bool {
-    path.extension().and_then(|extension| extension.to_str()) == Some("toml")
-}
-
-/// Writes a temp file beside `path`, then renames it over `path`.
-pub fn save(path: &Path, settings: &Settings) -> anyhow::Result<()> {
-    let mut settings = settings.clone();
-    settings.extra.clear();
-    let folder = path
-        .parent()
-        .with_context(|| format!("settings: {} has no folder", path.display()))?;
-    fs::create_dir_all(folder)
-        .with_context(|| format!("settings: cannot create {}", folder.display()))?;
-    let mut text = if is_toml(path) {
-        toml::to_string_pretty(&settings).context("settings: cannot encode TOML")?
-    } else {
-        serde_json::to_string_pretty(&settings).context("settings: cannot encode")?
-    };
-    text.push('\n');
-    let count = SAVES.fetch_add(1, Ordering::Relaxed);
-    let temp = path.with_extension(format!("json.{}-{count}.tmp", std::process::id()));
-    let written = fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&temp)
-        .and_then(|mut file| {
-            file.write_all(text.as_bytes())?;
-            file.sync_all()
-        })
-        .and_then(|()| fs::rename(&temp, path));
-    if let Err(error) = written {
-        if temp.exists()
-            && let Err(left) = fs::remove_file(&temp)
-        {
-            log::error!("settings: {} stays behind: {left}", temp.display());
-        }
-        return Err(error).with_context(|| {
-            format!(
-                "settings: cannot write {} through {}",
-                path.display(),
-                temp.display()
-            )
-        });
-    }
-    log::info!("settings: saved {}", path.display());
-    Ok(())
-}
-
-/// Saves made by this process, so each temp file has its own name.
-static SAVES: AtomicU64 = AtomicU64::new(0);
 
 #[cfg(test)]
 mod tests {

@@ -90,8 +90,7 @@ impl Modes {
                             self.win32 = byte == b'h';
                         }
                     }
-                    // The old alternate screens ask for the same screen 1049 does, as xterm says; the
-                    // tap writes them on to the parser as 1049 asks, since vte holds none of them.
+                    // The old alternate screens ask for the same screen 1049 does, as xterm says; the tap writes them on to the parser as 1049 asks, since vte holds none of them.
                     if self
                         .params
                         .iter()

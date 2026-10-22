@@ -99,11 +99,7 @@ type Raw = tty::Pty;
 /// The lines of a program's own output a failed start keeps, enough to say what went wrong.
 pub const STDERR: usize = 8;
 
-/// Why a session could not start: what was tried, in what folder, and what the program said.
-///
-/// A start that fails used to say nothing a user could act on. This is what they see, and what they
-/// can copy into an issue: the program and its arguments, the folder, the error, and the first lines
-/// the program wrote itself, which is where a shell says why it will not run.
+/// Why a session could not start: what was tried, in what folder, and what the program said. A start that fails used to say nothing a user could act on; this is what they see and what they can copy into an issue — the program and its arguments, the folder, the error, and the first lines the program wrote itself, where a shell says why it will not run.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Failed {
     /// The program and its arguments, as the settings or the scan named them; none runs the login shell.
@@ -152,10 +148,7 @@ pub fn failed(
         said: said.into_iter().take(STDERR).collect(),
     }
 }
-/// The first `STDERR` lines of `text` that say something, each without its controls and trimmed.
-///
-/// A program that will not start writes why to the terminal it was given; those are the lines worth
-/// keeping. Controls and empty lines go, so the report reads as the user would read it.
+/// The first `STDERR` lines of `text` that say something, each without its controls and trimmed. A program that will not start writes why to the terminal it was given, and those are the lines worth keeping; controls and empty lines go, so the report reads as the user would read it.
 pub fn said(text: &str) -> Vec<String> {
     text.lines()
         .map(|line| {

@@ -2,11 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-/// What a session's header says of Git: which branch its folder sits in.
-///
-/// Reading `.git/HEAD` is cheap and needs no process; the counts that say a tree is dirty are not,
-/// so the badge says which branch and leaves the accounting to the Git panel. A folder outside a
-/// work tree says nothing at all, and so does a detached HEAD.
+/// What a session's header says of Git: which branch its folder sits in. Reading `.git/HEAD` costs no process, while the counts that make a tree dirty would, so the badge names the branch and leaves the accounting to the Git panel; a folder outside a work tree, or a detached HEAD, says nothing.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Branch {
     pub name: String,

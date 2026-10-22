@@ -19,11 +19,7 @@ impl TerminalView {
             .write(query.answer(self.term_mode(), mouse).into_bytes());
     }
 
-    /// The grid's own reply to a DA1 or DECRQM query, answered again honestly; another stands.
-    ///
-    /// The grid calls itself VT102 and knows almost nothing of the modes this terminal holds, so a
-    /// program that asks would take it for less than it is. Its reply is the only `?…c` and `…$y`
-    /// it writes, so each is read back here and said again.
+    /// The grid's own reply to a DA1 or DECRQM query, answered again honestly; another stands. The grid calls itself VT102 and knows almost nothing of the modes this terminal holds, so a program that asks would take it for less than it is; its reply is the only `?鈥` and `鈥?y` it writes, so each is read back here and said again.
     pub(super) fn reply(&mut self, text: String) {
         let mouse = self.mouse;
         let honest = device::honest(&text, self.term_mode(), mouse);

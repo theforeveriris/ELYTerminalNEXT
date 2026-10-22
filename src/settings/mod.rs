@@ -2,6 +2,7 @@ pub mod language;
 mod seed;
 pub(crate) mod store;
 pub mod window;
+mod write;
 
 use std::{
     collections::HashMap,
@@ -18,7 +19,8 @@ use crate::themes;
 
 pub use language::Language;
 pub use seed::commented;
-pub use store::{SettingsStore, load, save};
+pub use store::{SettingsStore, load};
+pub use write::save;
 
 /// Where a new session starts.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]

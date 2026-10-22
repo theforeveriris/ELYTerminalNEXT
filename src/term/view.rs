@@ -187,31 +187,6 @@ impl TerminalView {
             _zoom: cx.observe_global::<zoom::Enlarged>(|_, cx| cx.notify()),
         }
     }
-
-    pub fn pid(&self) -> u32 {
-        self.pty.pid
-    }
-
-    /// The cells its grid holds now: columns and lines.
-    pub fn size(&self) -> (usize, usize) {
-        self.size
-    }
-
-    /// What programs in this terminal say they are doing.
-    pub fn records(&self) -> &Records {
-        &self.records
-    }
-
-    /// The status its shell's last command ended with.
-    pub fn ended(&self) -> Option<i32> {
-        self.ended
-    }
-
-    /// Whether it is the session shown: one shown in an active window posts no notification.
-    pub fn set_front(&mut self, front: bool) {
-        self.front = front;
-    }
-
     /// Tells a program that asked, by mode 1004, when the terminal gains or loses focus.
     fn refocus(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.active = window.is_window_active();

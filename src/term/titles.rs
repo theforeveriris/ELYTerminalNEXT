@@ -52,11 +52,7 @@ impl Titles {
     }
 }
 
-/// A title as the window shows it: on one line, with what could disguise it gone, and cut to `SHOWN`.
-///
-/// A program may write controls a title must not carry: an escape that ends it and sets a color, or a
-/// direction control that reorders what the user reads. C0 and C1 controls, the direction controls and
-/// the invisible formatting go, as do newlines; joiners stay, as scripts and emoji need them.
+/// A title as the window shows it: on one line, with what could disguise it gone, and cut to `SHOWN`. A program may write controls a title must not carry, an escape that ends it and sets a color or a direction control that reorders what the user reads; C0 and C1 controls, the direction controls and the invisible formatting go, as do newlines, while joiners stay, as scripts and emoji need them.
 pub fn clean(title: &str) -> String {
     let kept: String = title
         .chars()

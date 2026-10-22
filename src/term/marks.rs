@@ -22,12 +22,7 @@ pub enum Click {
     Relative,
 }
 
-/// The mark in an OSC 133 body past `133;`; none for one the terminal takes no action on.
-///
-/// VS Code's shell integration writes the same marks under OSC 633, so both read alike. The options
-/// a mark may carry 鈥?`aid` to pair a prompt with its command, `cl` and `cmdline_url` describing the
-/// line, `k` naming which prompt, `err` explaining a failure 鈥?are read past: what the terminal acts
-/// on is the letter and, for `D`, the status.
+/// The mark in an OSC 133 body past `133;`, and none for one the terminal takes no action on. VS Code writes the same marks under OSC 633, so both read alike, and the options a mark may carry, aid, cl, cmdline_url, k and err, are read past rather than refusing it; what the terminal acts on is the letter and, for D, the status.
 pub(crate) fn read(body: &[u8]) -> Option<Mark> {
     let shown = || String::from_utf8_lossy(body);
     let Some((&letter, rest)) = body.split_first() else {
@@ -114,8 +109,7 @@ pub(crate) fn failed_with(options: &[u8]) -> Option<&str> {
     })
 }
 
-/// The command id and error an OSC 133 mark carries, for a session that pairs a prompt with its
-/// command and keeps why it failed: `Some` for a D with `err`, and the `aid` both marks may name.
+/// The command id and error an OSC 133 mark carries, for a session that pairs a prompt with its command and keeps why it failed.
 pub(crate) fn options(body: &[u8]) -> (Option<String>, Option<String>) {
     let Some((&letter, rest)) = body.split_first() else {
         return (None, None);

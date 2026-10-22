@@ -193,10 +193,7 @@ pub fn row(
     )
 }
 
-/// Where a session sits, when it is not this machine: its WSL distribution, or the host it sshs to.
-///
-/// The launch is what the session was started with, so a WSL shell names its distribution and an
-/// ssh one the host in its arguments — the host the session was given, not one guessed from output.
+/// Where a session sits, when it is not this machine: its WSL distribution, or the host it sshs to. The launch says how the session started, so a WSL shell names its distribution and an ssh one the host in its arguments, rather than one guessed from output.
 pub fn connection(launch: &crate::term::Launch) -> Option<String> {
     match &launch.target {
         Target::Wsl { distro } if distro != "default" => Some(format!("WSL: {distro}")),

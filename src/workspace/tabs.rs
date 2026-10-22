@@ -11,11 +11,7 @@ use crate::term::{
     Events, Launch, Pty, Quote, Target, TerminalView, config, opened, pty::failed as failure, spawn,
 };
 
-/// How a session is started again as a clone: its program, in the folder it last reported.
-///
-/// A clone takes no scrollback and no running state with it: the terminal is new, and only the
-/// program, its variables and the folder are the same, so a tab opened beside one in `~/src/api`
-/// starts there too.
+/// How a session is started again as a clone: its program, in the folder it last reported. A clone takes no scrollback and no running state with it, since the terminal is new and only the program, its variables and the folder are the same, so a tab opened beside one in `~/src/api` starts there too.
 pub(crate) fn clone_of(launch: &Launch, folder: &std::path::Path) -> Launch {
     Launch {
         cwd: folder.to_path_buf(),
@@ -471,10 +467,9 @@ impl Workspace {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
 
     use super::*;
-
+    use std::path::PathBuf;
     fn launch(cwd: &str) -> Launch {
         Launch {
             program: Some(("/bin/sh".into(), vec!["-l".into()])),

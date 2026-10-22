@@ -108,9 +108,7 @@ impl Blocks {
         summary
     }
 
-    /// The block after `from`, or before it, round the ends; with `failed`, only those that failed.
-    ///
-    /// Navigation walks the commands that ended, oldest first, so a key finds the same block twice.
+    /// The block after `from`, or before it, round the ends; with `failed`, only those that failed. Navigation walks the commands that ended, oldest first, so a key finds the same block twice.
     pub fn step(&self, from: Option<usize>, newer: bool, failed: bool) -> Option<usize> {
         let count = self.done.len();
         if count == 0 {
@@ -143,10 +141,7 @@ impl Blocks {
     }
 }
 
-/// `blocks` as a text, a Markdown table or JSON, one row per command that ended.
-///
-/// A command is what the user typed, its exit status and how long it ran — nothing of its output.
-/// That is what a bug report wants and what a shared note can hold without pasting a screen.
+/// `blocks` as a text, a Markdown table or JSON, one row per command that ended. A command is what the user typed, its exit status and how long it ran, never its output, which is what a bug report wants and a shared note can hold without pasting a screen.
 pub fn export(blocks: &Blocks, format: Export) -> String {
     let rows: Vec<(&Block, Option<&str>)> = blocks
         .done
@@ -337,10 +332,6 @@ impl Blocks {
         }
     }
 
-    /// Keeps `command`, the line typed at the prompt, on the block the prompt began at `prompt_line`.
-    ///
-    /// The prompt mark already moved the current block on; the line belongs to the one before it,
-    /// whose prompt is the line the output started on.
     /// Keeps `command`, the line typed at the prompt, on the block whose prompt is at `prompt_line`.
     pub(crate) fn typed(&mut self, command: String, prompt_line: i32) {
         let found = self
