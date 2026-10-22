@@ -153,7 +153,7 @@ pub fn seeded(path: &Path) -> anyhow::Result<()> {
 
 /// The file's settings; defaults when there is no file. A file that fails to read or check is an error.
 pub fn load(path: &Path) -> anyhow::Result<Settings> {
-    let text = match fs::read_to_string(path) {
+    let text = match super::read_text(path) {
         Ok(text) => text,
         Err(error) if error.kind() == ErrorKind::NotFound => {
             log::info!("settings: no file at {}, defaults", path.display());

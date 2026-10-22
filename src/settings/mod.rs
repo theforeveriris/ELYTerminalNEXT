@@ -270,6 +270,15 @@ impl Settings {
     }
 }
 
+/// The text at `path`, without a byte-order mark an editor may put in front of it. Notepad and several editors write UTF-8 with a BOM, and a parser reads it as the first character of the file: for JSON and TOML that is a syntax error on line 1, which looks to a user like a broken file rather than a mark, so it is dropped here for every reader.
+pub fn read_text(path: &Path) -> std::io::Result<String> {
+    let text = std::fs::read_to_string(path)?;
+    Ok(match text.strip_prefix('\u{feff}') {
+        Some(rest) => rest.to_string(),
+        None => text,
+    })
+}
+
 /// The program `shell` names, as a session starts it: a file at a full path, or the first in `PATH`'s full folders.
 pub fn program_path(shell: &str) -> anyhow::Result<String> {
     let folders = env::var_os("PATH").unwrap_or_default();

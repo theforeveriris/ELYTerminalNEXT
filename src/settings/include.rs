@@ -1,9 +1,6 @@
 //! Laying one settings file over another: a project's settings over the user's, a host's over both. A file names the files it builds on with `include`, a string or a list of them, each relative to itself, and those are laid first across each other before the file's own fields go over theirs; a file that comes home to one already laid stops there, so a loop of includes ends instead of running on.
 
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use anyhow::Context as _;
 
@@ -87,7 +84,7 @@ fn lay(path: &Path, seen: &mut Vec<PathBuf>) -> anyhow::Result<Settings> {
         return Ok(settings);
     }
     seen.push(read.clone());
-    let text = fs::read_to_string(path)
+    let text = super::read_text(path)
         .with_context(|| format!("settings: cannot read {}", path.display()))?;
     let document: toml::Table = toml::from_str(&text)
         .map_err(|error| anyhow::anyhow!("settings: {} does not parse: {error}", path.display()))?;

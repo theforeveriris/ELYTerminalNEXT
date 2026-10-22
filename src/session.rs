@@ -41,7 +41,7 @@ pub fn path() -> Option<PathBuf> {
 
 /// The tabs in `path`, or none when there is no file, it does not read, or it keeps none.
 pub fn load(path: &Path) -> Option<Saved> {
-    let text = match fs::read_to_string(path) {
+    let text = match crate::settings::read_text(path) {
         Ok(text) => text,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return None,
         Err(error) => {

@@ -244,6 +244,29 @@ fn a_relative_folder_counts_for_none() {
 }
 
 #[test]
+fn a_file_an_editor_saved_with_a_byte_order_mark_still_reads() {
+    use std::fs;
+    let root = env::temp_dir().join(format!("elyterminal-bom-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(&root).expect("a test folder");
+    let json = root.join("settings.json");
+    fs::write(&json, "\u{feff}{\"font_size\": 14.0}").expect("a file with a mark");
+    assert_eq!(
+        load(&json).expect("a mark is no syntax error").font_size,
+        14.0
+    );
+    let toml = root.join("config.toml");
+    fs::write(&toml, "\u{feff}font_size = 15.0\n").expect("a TOML with a mark");
+    assert_eq!(
+        store::load_toml(&toml)
+            .expect("a mark is dropped")
+            .font_size,
+        15.0
+    );
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[test]
 fn a_nan_is_out_of_range() {
     let settings = Settings {
         font_size: f32::NAN,
