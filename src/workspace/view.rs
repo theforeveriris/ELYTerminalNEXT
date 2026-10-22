@@ -19,10 +19,10 @@ use gpui::{
 };
 
 use super::{
-    CONTEXT, CloneSession, ClosePane, CloseSession, CloseTab, FocusPane, LastSession, LastTab,
-    NewSession, NewTab, NextSession, NextTab, NextUsed, PreviousSession, PreviousTab, PreviousUsed,
-    SelectSession, SelectTab, Side, SplitDown, SplitRight, SwapPane, TogglePanel, ToggleSessions,
-    Workspace, Zen, ZoomPane, badge, status,
+    CONTEXT, CloneSession, ClosePane, CloseSession, CloseTab, EvenPanes, FocusPane, LastSession,
+    LastTab, NewSession, NewTab, NextSession, NextTab, NextUsed, PreviousSession, PreviousTab,
+    PreviousUsed, SelectSession, SelectTab, Side, SplitDown, SplitRight, SwapPane, TogglePanel,
+    ToggleSessions, Workspace, Zen, ZoomPane, badge, status,
 };
 use crate::menus;
 use crate::sessions::{self, Session};
@@ -196,45 +196,6 @@ impl Workspace {
             .child(Caption::new(SharedString::from(report.text())));
         div().relative().child(card)
     }
-
-    /// The panes of the shown tab, laid out as a grid.
-    fn panes(&self) -> impl IntoElement {
-        let Some(tab) = self.tab() else {
-            return div().size_full();
-        };
-        if let Some(id) = self.zoom
-            && tab.holds(id)
-            && let Some(session) = self.session(id)
-        {
-            return div().size_full().child(session.terminal.clone());
-        }
-        let rows = tab.rows();
-        let mut out = div().flex().flex_col().size_full();
-        for row in rows {
-            let mut line = div().flex().flex_row().flex_1().min_h_0();
-            for (at, index) in row.iter().enumerate() {
-                let Some(pane) = tab.panes.get(*index) else {
-                    continue;
-                };
-                let Some(session) = self.session(pane.session) else {
-                    continue;
-                };
-                let focused = tab.focused == *index;
-                let terminal = session.terminal.clone();
-                let mut cell = div().flex_1().min_w_0().min_h_0().child(terminal);
-                if !focused {
-                    // A pane that is not focused is dimmed, so the focus is obvious.
-                    cell = cell.opacity(0.72);
-                }
-                if at + 1 < row.len() {
-                    cell = cell.border_r_1();
-                }
-                line = line.child(cell);
-            }
-            out = out.child(line);
-        }
-        out
-    }
 }
 
 impl Render for Workspace {
@@ -278,7 +239,7 @@ impl Render for Workspace {
         let mut shell = ColumnShell::new("workspace").glass();
         let mut terminal = ShellColumn::new("terminal")
             .title(self.title().to_string())
-            .child(self.panes());
+            .child(super::panes::grid(self, &workspace));
         // STAT-14: a line under the terminal says where the session sits, its size and its branch. Its cells are read here, before the pane is drawn, from the grid the session holds.
         let cells = self
             .session(self.active)
@@ -473,6 +434,10 @@ impl Render for Workspace {
             .on_action(cx.listener(|this, _: &ClosePane, window, cx| this.close_pane(window, cx)))
             .on_action(cx.listener(|this, _: &ZoomPane, _, cx| this.toggle_zoom(cx)))
             .on_action(cx.listener(|this, _: &Zen, _, cx| this.toggle_zen(cx)))
+            .on_action(cx.listener(|this, _: &EvenPanes, _, cx| {
+                let focused = this.tab().map_or(0, |tab| tab.focused);
+                this.even_panes(focused, cx)
+            }))
             .on_action(cx.listener(|this, focus: &FocusPane, window, cx| {
                 this.focus_pane(focus.0, window, cx)
             }))

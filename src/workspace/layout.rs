@@ -4,22 +4,28 @@
 pub struct Pane {
     /// The session it shows, by its id, which never changes.
     pub session: SessionId,
-    /// How much of the tab's width it takes, in tenths.
+    /// How much of its row's width it takes; the panes of a row weigh against one another.
     pub width: u16,
-    /// How much of the tab's height it takes, in tenths.
+    /// How much of the tab's height its row takes; rows weigh against one another.
     pub height: u16,
+    /// Whether it begins a row of its own, which a split above or below it makes true.
+    pub row: bool,
 }
 
 /// A session's id, which stays the same as the session moves and closes.
 pub type SessionId = u64;
+
+/// The least share a pane keeps, so a drag never leaves a pane to vanish.
+pub const LEAST: u16 = 5;
 
 impl Pane {
     /// A pane that takes the whole tab.
     pub fn whole(session: SessionId) -> Self {
         Self {
             session,
-            width: 10,
-            height: 10,
+            width: 100,
+            height: 100,
+            row: true,
         }
     }
 }
@@ -121,14 +127,17 @@ impl Tab {
         }
     }
 
-    /// The panes in rows, as a split lays them out: a pane that takes less than the whole height starts a new row.
+    /// The panes in rows, as a split lays them out: a pane whose `row` says so begins a new row, and the panes of a row weigh their widths against one another.
     pub fn rows(&self) -> Vec<Vec<usize>> {
-        let mut rows: Vec<Vec<usize>> = vec![Vec::new()];
+        let mut rows: Vec<Vec<usize>> = Vec::new();
         for (index, pane) in self.panes.iter().enumerate() {
-            if pane.height < 10 && !rows.last().is_some_and(|row| row.is_empty()) {
+            if pane.row || rows.is_empty() {
                 rows.push(Vec::new());
             }
             rows.last_mut().expect("a row").push(index);
+        }
+        if rows.is_empty() {
+            rows.push(Vec::new());
         }
         rows
     }
@@ -138,25 +147,109 @@ impl Tab {
         let at = self.focused;
         let old = self.panes.get_mut(at)?;
         let new = if vertical {
-            let half = old.width / 2;
-            old.width = half;
+            let half = (old.width / 2).max(LEAST);
+            old.width = old.width.saturating_sub(half).max(LEAST);
             Pane {
                 session,
                 width: half,
                 height: old.height,
+                row: false,
             }
         } else {
-            let half = old.height / 2;
-            old.height = half;
+            let half = (old.height / 2).max(LEAST);
+            old.height = old.height.saturating_sub(half).max(LEAST);
             Pane {
                 session,
                 width: old.width,
                 height: half,
+                row: true,
             }
         };
         self.panes.insert(at + 1, new);
         self.focused = at + 1;
         Some(at + 1)
+    }
+
+    /// Moves `share` percent of the width from the pane before `index` to it, or back, keeping both at least `LEAST`; false at a row's edge.
+    pub fn widen(&mut self, index: usize, share: i16) -> bool {
+        let Some(row) = self.row_of(index) else {
+            return false;
+        };
+        let at = row.iter().position(|pane| *pane == index).unwrap_or(0);
+        if at == 0 {
+            return false;
+        }
+        let left = row[at - 1];
+        let right = row[at];
+        let (gave, took) = (self.panes[left].width, self.panes[right].width);
+        let give = share.clamp(
+            -i16::try_from(took - LEAST).unwrap_or(i16::MAX),
+            i16::try_from(gave - LEAST).unwrap_or(i16::MAX),
+        );
+        if give == 0 {
+            return false;
+        }
+        self.panes[left].width = (gave as i16 - give) as u16;
+        self.panes[right].width = (took as i16 + give) as u16;
+        true
+    }
+
+    /// Moves `share` of the height from the row above `index` to its row, or back; false at the top row.
+    pub fn heighten(&mut self, index: usize, share: i16) -> bool {
+        let rows = self.rows();
+        let Some(line) = rows.iter().position(|row| row.contains(&index)) else {
+            return false;
+        };
+        if line == 0 {
+            return false;
+        }
+        let above = self.panes[rows[line - 1][0]].height;
+        let below = self.panes[rows[line][0]].height;
+        let give = share.clamp(
+            -i16::try_from(below - LEAST).unwrap_or(i16::MAX),
+            i16::try_from(above - LEAST).unwrap_or(i16::MAX),
+        );
+        if give == 0 {
+            return false;
+        }
+        for row in &rows[..line] {
+            for pane in row {
+                self.panes[*pane].height = (above as i16 - give) as u16;
+            }
+        }
+        for row in &rows[line..] {
+            for pane in row {
+                self.panes[*pane].height = (below as i16 + give) as u16;
+            }
+        }
+        true
+    }
+
+    /// Gives every pane of `index`'s row an equal width, and every row an equal height.
+    pub fn even(&mut self, index: usize) -> bool {
+        let Some(row) = self.row_of(index) else {
+            return false;
+        };
+        let count = row.len() as u16;
+        if count < 2 {
+            return false;
+        }
+        let rows = self.rows();
+        let each = (100 / rows.len() as u16).max(LEAST);
+        for line in &rows {
+            for pane in line {
+                self.panes[*pane].height = each;
+            }
+        }
+        for pane in &row {
+            self.panes[*pane].width = (100 / count).max(LEAST);
+        }
+        true
+    }
+
+    /// The panes sharing `index`'s row.
+    fn row_of(&self, index: usize) -> Option<Vec<usize>> {
+        self.rows().into_iter().find(|row| row.contains(&index))
     }
 
     /// Exchanges the focused pane with its neighbour in `direction`, and moves the focus with it.
@@ -170,12 +263,20 @@ impl Tab {
         true
     }
 
-    /// Removes the pane at `index`; the tab is empty when the last one goes.
+    /// Removes the pane at `index`; the tab is empty when the last one goes, and the pane that led a row hands that to the next.
     pub fn remove(&mut self, index: usize) -> bool {
         if index >= self.panes.len() {
             return false;
         }
+        let led_row = self.panes[index].row;
         self.panes.remove(index);
+        if led_row && let Some(next) = self.panes.get_mut(index) {
+            if next.row {
+                // The next pane already leads a row of its own; nothing to hand on.
+            } else {
+                next.row = true;
+            }
+        }
         if self.focused >= self.panes.len() {
             self.focused = self.panes.len().saturating_sub(1);
         }
@@ -236,9 +337,9 @@ mod tests {
         assert_eq!(tab.panes.len(), 2);
         assert_eq!(tab.focused, 1, "the new pane has the focus");
         assert_eq!(tab.rows(), vec![vec![0, 1]], "one row");
-        assert_eq!(tab.panes[0].width, 5);
-        assert_eq!(tab.panes[1].width, 5);
-        assert_eq!(tab.panes[0].height, 10, "the height is untouched");
+        assert_eq!(tab.panes[0].width, 50);
+        assert_eq!(tab.panes[1].width, 50);
+        assert_eq!(tab.panes[0].height, 100, "the height is untouched");
     }
 
     #[test]
@@ -247,8 +348,8 @@ mod tests {
         tab.split(false, 0);
         assert_eq!(tab.panes.len(), 2);
         assert_eq!(tab.rows(), vec![vec![0], vec![1]], "two rows");
-        assert_eq!(tab.panes[0].height, 5);
-        assert_eq!(tab.panes[1].height, 5);
+        assert_eq!(tab.panes[0].height, 50);
+        assert_eq!(tab.panes[1].height, 50);
     }
 
     #[test]
@@ -327,5 +428,48 @@ mod tests {
         assert_eq!(tab.sessions(), vec![1, 2]);
         tab.split(false, 3);
         assert_eq!(tab.sessions(), vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn a_drag_moves_a_share_between_neighbours_and_stops_at_the_least() {
+        let mut tab = Tab::new(0);
+        tab.split(true, 1);
+        assert_eq!((tab.panes[0].width, tab.panes[1].width), (50, 50));
+        assert!(tab.widen(1, 20), "the right pane grows");
+        assert_eq!((tab.panes[0].width, tab.panes[1].width), (30, 70));
+        assert!(tab.widen(1, -20), "and gives it back");
+        assert_eq!((tab.panes[0].width, tab.panes[1].width), (50, 50));
+        assert!(!tab.widen(0, 10), "the first pane has no left neighbour");
+        assert!(tab.widen(1, 90));
+        assert_eq!(tab.panes[0].width, LEAST, "the left pane keeps its least");
+        assert_eq!(tab.panes[1].width, 100 - LEAST);
+        assert!(!tab.widen(1, 90), "no room left to give");
+    }
+
+    #[test]
+    fn a_drag_between_rows_moves_their_heights_together() {
+        let mut tab = Tab::new(0);
+        tab.split(false, 1);
+        assert_eq!((tab.panes[0].height, tab.panes[1].height), (50, 50));
+        assert!(tab.heighten(1, 10));
+        assert_eq!((tab.panes[0].height, tab.panes[1].height), (40, 60));
+        assert!(!tab.heighten(0, 10), "the first row has none above it");
+        tab.heighten(1, 100);
+        assert_eq!(tab.panes[0].height, LEAST);
+    }
+
+    #[test]
+    fn a_row_and_the_rows_are_evened_again_at_once() {
+        let mut tab = Tab::new(0);
+        tab.split(true, 1);
+        tab.split(false, 2);
+        tab.widen(1, 20);
+        assert!(tab.even(1));
+        assert_eq!(tab.panes[0].width, 50);
+        assert_eq!(tab.panes[1].width, 50);
+        assert_eq!(tab.panes[0].height, 50);
+        assert_eq!(tab.panes[2].height, 50);
+        let mut alone = Tab::new(0);
+        assert!(!alone.even(0), "a pane alone has nothing to even out");
     }
 }

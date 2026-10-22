@@ -1,8 +1,8 @@
 use std::time::Instant;
 
 use gpui::{
-    Action, App, AppContext, Context, Entity, FocusHandle, Focusable, KeyBinding, Subscription,
-    Task, Window, actions,
+    Action, AppContext, Context, Entity, FocusHandle, Focusable, Subscription, Task, Window,
+    actions,
 };
 
 use crate::{
@@ -20,8 +20,10 @@ mod chrome;
 mod events;
 mod filter;
 mod health;
+mod keys;
 mod layout;
 mod mru;
+mod panes;
 mod rename;
 mod restore;
 mod status;
@@ -31,6 +33,8 @@ mod widths;
 
 use layout::{Direction, Pane, SessionId, Tab};
 use widths::{Dragged, Side};
+
+pub use keys::bind as bind_keys;
 
 actions!(
     elyterminal,
@@ -55,7 +59,8 @@ actions!(
         ZoomPane,
         Zen,
         CloneSession,
-        CheckHealth
+        CheckHealth,
+        EvenPanes
     ]
 );
 
@@ -84,104 +89,6 @@ pub const CONTEXT: &str = "Workspace";
 
 /// The window's title while the program names none.
 pub const TITLE: &str = "ELYTerminal";
-
-/// Ghostty's keys: Cmd on macOS; off it, Ctrl-Shift for keys a terminal takes, Alt for digits.
-pub fn bind_keys(cx: &mut App) {
-    let (sessions, panel, new, close, digit) = if cfg!(target_os = "macos") {
-        ("cmd-b", "cmd-alt-b", "cmd-t", "cmd-w", "cmd")
-    } else {
-        (
-            "ctrl-shift-b",
-            "ctrl-shift-alt-b",
-            "ctrl-shift-t",
-            "ctrl-shift-w",
-            "alt",
-        )
-    };
-    // The tabs and the panes, as Ghostty binds them.
-    let (tab_new, tab_close, split, split_down, pane) = if cfg!(target_os = "macos") {
-        ("cmd-t", "cmd-w", "cmd-d", "cmd-shift-d", "cmd-alt")
-    } else {
-        (
-            "ctrl-shift-t",
-            "ctrl-shift-w",
-            "ctrl-shift-d",
-            "ctrl-shift-alt-d",
-            "ctrl-shift-alt",
-        )
-    };
-    let (zoom, zen) = if cfg!(target_os = "macos") {
-        ("cmd-shift-enter", "cmd-shift-z")
-    } else {
-        ("ctrl-shift-enter", "ctrl-shift-z")
-    };
-    let swap = if cfg!(target_os = "macos") {
-        "cmd-alt-shift"
-    } else {
-        "ctrl-alt"
-    };
-    let tab_clone = if cfg!(target_os = "macos") {
-        "cmd-shift-k"
-    } else {
-        "ctrl-shift-k"
-    };
-    let context = Some(CONTEXT);
-    cx.bind_keys([
-        KeyBinding::new(sessions, ToggleSessions, context),
-        KeyBinding::new(panel, TogglePanel, context),
-    ]);
-    // The tabs take the plain keys, and the sessions the shifted ones.
-    cx.bind_keys([
-        KeyBinding::new(tab_new, NewTab, context),
-        KeyBinding::new(tab_close, CloseTab, context),
-        KeyBinding::new(split, SplitRight, context),
-        KeyBinding::new(split_down, SplitDown, context),
-        KeyBinding::new(&format!("{pane}-w"), ClosePane, context),
-        KeyBinding::new(zoom, ZoomPane, context),
-        KeyBinding::new(zen, Zen, context),
-        // TAB-13 and the health check: a clone of the session, and a report on the machine.
-        KeyBinding::new(tab_clone, CloneSession, context),
-        KeyBinding::new("ctrl-shift-alt-h", CheckHealth, context),
-    ]);
-    cx.bind_keys([
-        KeyBinding::new(new, NewSession, context),
-        KeyBinding::new(close, CloseSession, context),
-        KeyBinding::new("ctrl-tab", NextUsed, context),
-        KeyBinding::new("ctrl-shift-tab", PreviousUsed, context),
-        KeyBinding::new("ctrl-pagedown", NextTab, context),
-        KeyBinding::new("ctrl-pageup", PreviousTab, context),
-        KeyBinding::new(&format!("{digit}-9"), LastTab, context),
-        // The sessions step within the shown tab.
-        KeyBinding::new("ctrl-shift-right", NextSession, context),
-        KeyBinding::new("ctrl-shift-left", PreviousSession, context),
-        KeyBinding::new(&format!("{digit}-shift-9"), LastSession, context),
-    ]);
-    cx.bind_keys(
-        (1..=8).map(|n| KeyBinding::new(&format!("{digit}-{n}"), SelectTab(n - 1), context)),
-    );
-    cx.bind_keys(
-        (1..=8)
-            .map(|n| KeyBinding::new(&format!("{digit}-shift-{n}"), SelectSession(n - 1), context)),
-    );
-    cx.bind_keys([
-        KeyBinding::new(&format!("{pane}-left"), FocusPane(Direction::Left), context),
-        KeyBinding::new(
-            &format!("{pane}-right"),
-            FocusPane(Direction::Right),
-            context,
-        ),
-        KeyBinding::new(&format!("{pane}-up"), FocusPane(Direction::Up), context),
-        KeyBinding::new(&format!("{pane}-down"), FocusPane(Direction::Down), context),
-        KeyBinding::new(&format!("{swap}-left"), SwapPane(Direction::Left), context),
-        KeyBinding::new(
-            &format!("{swap}-right"),
-            SwapPane(Direction::Right),
-            context,
-        ),
-        KeyBinding::new(&format!("{swap}-up"), SwapPane(Direction::Up), context),
-        KeyBinding::new(&format!("{swap}-down"), SwapPane(Direction::Down), context),
-    ]);
-}
 
 /// The main window's content: sessions, the terminal, and Git or Files, in Ely's columns.
 pub struct Workspace {
@@ -216,6 +123,8 @@ pub struct Workspace {
     filter: filter::Filter,
     /// Why the session this window opened with could not start, while it keeps none.
     pub(crate) start_failed: Option<Failed>,
+    /// The border between two panes, while one is dragged.
+    pane_drag: Option<panes::Dragging>,
     /// The health check's report while the user has it open.
     pub(crate) health: Option<crate::health::Report>,
     _settings: Subscription,
@@ -296,6 +205,7 @@ impl Workspace {
             mru: mru::Mru::default(),
             filter: filter::Filter::new(window, cx),
             start_failed: failed,
+            pane_drag: None,
             health: None,
             _settings: cx.observe_global_in::<SettingsStore>(window, |this, window, cx| {
                 this.background.follow(window, SettingsStore::get(cx));
@@ -351,10 +261,12 @@ impl Workspace {
         };
         if tab.panes.len() == 1 {
             // The first pane keeps its session; the new one joins it.
+            tab.panes[0].width = 50;
             tab.panes.push(Pane {
                 session: id,
-                width: 5,
-                height: 10,
+                width: 50,
+                height: 100,
+                row: false,
             });
             tab.focused = 1;
         } else {
