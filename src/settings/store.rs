@@ -150,7 +150,7 @@ pub fn load(path: &Path) -> anyhow::Result<Settings> {
         .with_context(|| format!("settings: {} holds a bad value", path.display()))?;
     warn_extra(&settings, path);
     log::info!("settings: loaded {}", path.display());
-    Ok(settings)
+    interpolated(settings, path)
 }
 
 /// The settings in `path`, read as TOML when the file is one and JSON otherwise.
@@ -160,6 +160,38 @@ pub fn load_any(path: &Path) -> anyhow::Result<Settings> {
     } else {
         load(path)
     }
+}
+
+/// Expands `${VAR}` in `text`, once, from the environment; one with no value is an error.
+///
+/// A path in a settings file is the same on every machine but the user's name and home, so those
+/// come from the environment. No substitution runs a command: this reads a variable's value, and
+/// a variable the environment does not hold names itself in the error.
+pub fn expand(text: &str) -> anyhow::Result<String> {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some((before, after)) = rest.split_once("${") {
+        let Some((name, tail)) = after.split_once('}') else {
+            return Err(anyhow::anyhow!(
+                "settings: {text:?} opens a variable and never closes it"
+            ));
+        };
+        if name.is_empty() {
+            return Err(anyhow::anyhow!("settings: {text:?} names no variable"));
+        }
+        out.push_str(before);
+        match std::env::var(name) {
+            Ok(value) => out.push_str(&value),
+            Err(_) => {
+                return Err(anyhow::anyhow!(
+                    "settings: {text:?} names {name}, which the environment holds no value for"
+                ));
+            }
+        }
+        rest = tail;
+    }
+    out.push_str(rest);
+    Ok(out)
 }
 
 /// The settings in a TOML file; no file gives the defaults, and a bad one names its line.
@@ -181,6 +213,29 @@ pub fn load_toml(path: &Path) -> anyhow::Result<Settings> {
         .with_context(|| format!("settings: {} holds a bad value", path.display()))?;
     warn_extra(&settings, path);
     log::info!("settings: loaded {}", path.display());
+    interpolated(settings, path)
+}
+
+/// A loaded file's settings with each `${VAR}` in a path or command expanded from the environment.
+fn interpolated(mut settings: Settings, path: &Path) -> anyhow::Result<Settings> {
+    for (field, value) in [
+        ("shell", &mut settings.shell),
+        ("editor", &mut settings.editor),
+        ("start_in_folder", &mut settings.start_in_folder),
+    ] {
+        if value.contains("${") {
+            *value = expand(value)
+                .with_context(|| format!("settings: {} holds a bad {field}", path.display()))?;
+        }
+    }
+    if let Some(last) = &settings.last_folder
+        && last.contains("${")
+    {
+        settings.last_folder =
+            Some(expand(last).with_context(|| {
+                format!("settings: {} holds a bad last_folder", path.display())
+            })?);
+    }
     Ok(settings)
 }
 

@@ -271,3 +271,25 @@ fn an_unknown_theme_fails() {
         "theme is \"mocha\", no built-in theme"
     );
 }
+
+#[test]
+fn a_variable_in_a_setting_reads_from_the_environment() {
+    unsafe { env::set_var("ELY_TEST_HOME", "/home/me") };
+    assert_eq!(
+        store::expand("${ELY_TEST_HOME}/src").expect("a value"),
+        "/home/me/src"
+    );
+    assert_eq!(
+        store::expand("${ELY_TEST_HOME}/${ELY_TEST_HOME}").expect("twice"),
+        "/home/me//home/me",
+    );
+    assert_eq!(store::expand("plain").expect("no variable"), "plain");
+    assert_eq!(store::expand("").expect("empty"), "");
+    assert!(
+        store::expand("${ELY_TEST_NOPE}").is_err(),
+        "a variable the environment holds no value for"
+    );
+    assert!(store::expand("${ELY_TEST_HOME").is_err(), "never closed");
+    assert!(store::expand("${}").is_err(), "names no variable");
+    unsafe { env::remove_var("ELY_TEST_HOME") };
+}
