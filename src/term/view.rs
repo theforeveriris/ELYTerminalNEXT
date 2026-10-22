@@ -90,6 +90,10 @@ pub struct TerminalView {
     pub(super) blocks: Blocks,
     /// The system notifications it posted.
     pub(super) notices: Notices,
+    /// A bell rang and its flash is still seen.
+    pub(super) flash: bool,
+    /// The task that ends the flash.
+    flashing: Option<Task<()>>,
     /// The program's title; empty while it names none.
     pub(super) title: String,
     /// It is the session shown.
@@ -152,6 +156,8 @@ impl TerminalView {
             shell: Shell::Busy,
             blocks: Blocks::default(),
             notices: Notices::default(),
+            flash: false,
+            flashing: None,
             title: String::new(),
             front: true,
             active: false,
@@ -343,6 +349,21 @@ impl TerminalView {
             | Event::ResetTitle => {}
             Event::Bell => {
                 log::debug!("terminal {}: a bell, kept silent", self.pty.pid);
+                let settings = SettingsStore::get(cx);
+                if settings.bell_visual && !settings.reduce_motion {
+                    self.flash = true;
+                    self.flashing = Some(cx.spawn(async move |this, cx| {
+                        cx.background_executor()
+                            .timer(Duration::from_millis(180))
+                            .await;
+                        this.update(cx, |view, cx| {
+                            view.flash = false;
+                            cx.notify();
+                        })
+                        .ok();
+                    }));
+                    cx.notify();
+                }
                 cx.emit(TerminalEvent::Bell);
             }
             Event::ClipboardStore(kind, text) => {
@@ -389,7 +410,7 @@ impl Render for TerminalView {
         let span = Span::of(&term);
         drop(term);
         let focused = self.focus.is_focused(window) && window.is_window_active();
-        self.blinking = focused && blinks;
+        self.blinking = focused && blinks && !settings.reduce_motion;
         if !self.blinking {
             self.shown = true;
         }
@@ -459,6 +480,14 @@ impl Render for TerminalView {
             .relative()
             .size_full()
             .child(root)
+            .children(self.flash.then(|| {
+                div()
+                    .absolute()
+                    .inset_0()
+                    .border_2()
+                    .border_color(cx.theme().colors.warning)
+                    .into_any_element()
+            }))
             .children(scrollbar::bar(span, &marks, window, cx))
             .children(
                 self.find_box(cx)

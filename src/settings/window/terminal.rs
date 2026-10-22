@@ -206,9 +206,20 @@ impl SettingsWindow {
             settings.restore_session,
             |settings, on| settings.restore_session = on,
         );
+        let bell = switch(this, "bell_visual", settings.bell_visual, |settings, on| {
+            settings.bell_visual = on
+        });
+        let still = switch(
+            this,
+            "reduce_motion",
+            settings.reduce_motion,
+            |settings, on| settings.reduce_motion = on,
+        );
         let ely = switch(this, "ely", settings.ely, |settings, on| settings.ely = on);
         let section = section
             .row(SettingsRow::new(language::message(cx, "settings.terminal.copy")).control(copy))
+            .row(SettingsRow::new(language::message(cx, "settings.terminal.bell")).control(bell))
+            .row(SettingsRow::new(language::message(cx, "settings.terminal.still")).control(still))
             .row(
                 SettingsRow::new(language::message(cx, "settings.terminal.restore"))
                     .control(restore),

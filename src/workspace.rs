@@ -281,7 +281,8 @@ impl Workspace {
         for session in &mut self.sessions {
             moving |= session.note(now, cx);
         }
-        let moving = moving && SettingsStore::get(cx).show_sessions;
+        let moving =
+            moving && SettingsStore::get(cx).show_sessions && !SettingsStore::get(cx).reduce_motion;
         if moving == self.ticking.is_some() {
             return;
         }

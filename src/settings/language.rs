@@ -132,6 +132,8 @@ const EN: &[(&str, &str)] = &[
     ("settings.terminal.option.right", "Right"),
     ("settings.terminal.option.both", "Both"),
     ("settings.terminal.copy", "Copy on select"),
+    ("settings.terminal.bell", "Flash on bell"),
+    ("settings.terminal.still", "Reduce motion"),
     ("settings.terminal.ely", "Ely"),
     (
         "settings.terminal.updates",
@@ -219,6 +221,8 @@ const ZH: &[(&str, &str)] = &[
     ("settings.terminal.option.right", "右侧"),
     ("settings.terminal.option.both", "两侧"),
     ("settings.terminal.copy", "选中即复制"),
+    ("settings.terminal.bell", "响铃时闪烁"),
+    ("settings.terminal.still", "减少动态效果"),
     ("settings.terminal.ely", "Ely"),
     ("settings.terminal.updates", "自动检查更新"),
     ("settings.terminal.updates.now", "立即检查"),

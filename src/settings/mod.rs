@@ -96,6 +96,10 @@ pub struct Settings {
     pub scrollback: u32,
     pub option_as_alt: OptionAsAlt,
     pub copy_on_select: bool,
+    /// A flash on the pane when a program rings the bell.
+    pub bell_visual: bool,
+    /// No blinking, orb motion or bell flash.
+    pub reduce_motion: bool,
     /// Ely peeks over the main window's top edge.
     pub ely: bool,
     /// How far in from the pane's left edge she stands, in points, as a drag left her.
@@ -151,6 +155,8 @@ impl Default for Settings {
             scrollback: 10_000,
             option_as_alt: OptionAsAlt::Off,
             copy_on_select: false,
+            bell_visual: true,
+            reduce_motion: false,
             ely: true,
             ely_left: 140.0,
             check_updates: true,
