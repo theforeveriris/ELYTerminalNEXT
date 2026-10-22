@@ -20,6 +20,7 @@ use crate::{
 };
 
 mod events;
+mod filter;
 mod layout;
 mod mru;
 mod rename;
@@ -201,6 +202,8 @@ pub struct Workspace {
     saving: Option<Task<()>>,
     /// The sessions in the order they were last shown.
     mru: mru::Mru,
+    /// The field that filters the sessions column.
+    filter: filter::Filter,
     _settings: Subscription,
     _acted: Subscription,
 }
@@ -243,6 +246,7 @@ impl Workspace {
             zen: false,
             saving: None,
             mru: mru::Mru::default(),
+            filter: filter::Filter::new(window, cx),
             _settings: cx.observe_global_in::<SettingsStore>(window, |this, window, cx| {
                 this.background.follow(window, SettingsStore::get(cx));
                 cx.notify();

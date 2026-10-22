@@ -76,6 +76,11 @@ impl Session {
 const LISTED: usize = 10;
 const SHORT: usize = 120;
 
+/// Whether a session named `name` in `folder` answers `query`, in lower case; an empty query answers all.
+pub fn matches(query: &str, name: &str, folder: &str) -> bool {
+    query.is_empty() || name.to_lowercase().contains(query) || folder.to_lowercase().contains(query)
+}
+
 /// `folder` as a row shows it: the home folder as `~`, on one line.
 pub fn shown(folder: &Path, home: Option<&Path>) -> String {
     let shown = match home.and_then(|home| folder.strip_prefix(home).ok()) {

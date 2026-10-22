@@ -4,6 +4,7 @@ use std::time::Instant;
 
 use ely_gpui_component::{
     buttons::{ButtonVariant, IconButton, SegmentedControl},
+    forms::Input,
     lists::{List, ListItem},
     primitives::{FocusScope, IconName},
     shell::{ColumnShell, ResizeBorder, ShellColumn},
@@ -63,6 +64,7 @@ impl Workspace {
     fn tabs_column(&self, workspace: &Entity<Workspace>, cx: &App) -> impl IntoElement {
         let home = dirs::home_dir();
         let now = Instant::now();
+        let query = self.filter.text.trim();
         let mut rows: Vec<AnyElement> = Vec::new();
         for (at, tab) in self.tabs.iter().enumerate() {
             let shown = at == self.active_tab;
@@ -71,6 +73,24 @@ impl Workspace {
                 .and_then(|id| self.session(id))
                 .map_or(TITLE, Session::named);
             let title = tab.named(title, TITLE).to_string();
+            let tab_matches = sessions::matches(query, &title, "");
+            let visible: Vec<_> = tab
+                .sessions()
+                .into_iter()
+                .filter(|id| {
+                    tab_matches
+                        || self.session(*id).is_some_and(|session| {
+                            sessions::matches(
+                                query,
+                                session.named(),
+                                &sessions::shown(&session.folder, home.as_deref()),
+                            )
+                        })
+                })
+                .collect();
+            if !query.is_empty() && !tab_matches && visible.is_empty() {
+                continue;
+            }
             let select = workspace.clone();
             let close = workspace.clone();
             // A tab names its own sessions, so it shows how many it holds.
@@ -101,7 +121,7 @@ impl Workspace {
             if !shown {
                 continue;
             }
-            for id in tab.sessions() {
+            for id in visible {
                 let Some(session) = self.session(id) else {
                     continue;
                 };
@@ -141,11 +161,24 @@ impl Workspace {
             }
         }
         div()
-            .id("tabs")
             .size_full()
-            .overflow_y_scroll()
-            .p_2()
-            .child(List::new().children(rows))
+            .flex()
+            .flex_col()
+            .child(
+                div()
+                    .px_2()
+                    .pt_2()
+                    .child(Input::new(&self.filter.field).size(ControlSize::Sm)),
+            )
+            .child(
+                div()
+                    .id("tabs")
+                    .flex_1()
+                    .min_h_0()
+                    .overflow_y_scroll()
+                    .p_2()
+                    .child(List::new().children(rows)),
+            )
     }
 
     /// Fills the window with the shown pane, or gives the grid back.

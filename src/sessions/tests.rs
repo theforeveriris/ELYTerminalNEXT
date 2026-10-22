@@ -22,6 +22,14 @@ fn folders_under_home_read_from_a_tilde() {
 }
 
 #[test]
+fn a_filter_finds_a_session_by_name_or_folder() {
+    assert!(matches("", "api", "/srv/api"));
+    assert!(matches("api", "api server", "/srv"));
+    assert!(matches("srv", "api", "/srv/api"));
+    assert!(!matches("docs", "api", "/srv/api"));
+}
+
+#[test]
 fn a_row_notes_how_the_last_command_went() {
     use crate::term::Phase;
     use std::time::{Duration, Instant};
