@@ -122,7 +122,12 @@ fn report(
             None => return,
         },
         Found::Osc(body, length) => {
-            if let Some(mark) = body.strip_prefix(b"133;").and_then(marks::read) {
+            // VS Code's shell integration writes the same marks as OSC 633; both read alike.
+            if let Some(mark) = body
+                .strip_prefix(b"133;")
+                .or_else(|| body.strip_prefix(b"633;"))
+                .and_then(marks::read)
+            {
                 log::debug!("pty {pid}: {mark:?}");
                 PtyEvent::Mark(mark)
             } else if let Some(status) = body

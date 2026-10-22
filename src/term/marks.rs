@@ -23,6 +23,11 @@ pub enum Click {
 }
 
 /// The mark in an OSC 133 body past `133;`; none for one the terminal takes no action on.
+///
+/// VS Code's shell integration writes the same marks under OSC 633, so both read alike. The options
+/// a mark may carry 鈥?`aid` to pair a prompt with its command, `cl` and `cmdline_url` describing the
+/// line, `k` naming which prompt, `err` explaining a failure 鈥?are read past: what the terminal acts
+/// on is the letter and, for `D`, the status.
 pub(crate) fn read(body: &[u8]) -> Option<Mark> {
     let shown = || String::from_utf8_lossy(body);
     let Some((&letter, rest)) = body.split_first() else {
@@ -91,6 +96,24 @@ fn status(options: &[u8]) -> Option<i32> {
     status
 }
 
+/// The command id an OSC 133 `aid` names, so a prompt and its command can be paired.
+pub(crate) fn aid(options: &[u8]) -> Option<&str> {
+    options.split(|&byte| byte == b';').find_map(|option| {
+        let rest = option.strip_prefix(b"aid=")?;
+        std::str::from_utf8(rest).ok().filter(|id| !id.is_empty())
+    })
+}
+
+/// Whether a `D` carries the shell's `err`, which says why a command failed in its own words.
+pub(crate) fn failed_with(options: &[u8]) -> Option<&str> {
+    options.split(|&byte| byte == b';').find_map(|option| {
+        let rest = option.strip_prefix(b"err=")?;
+        std::str::from_utf8(rest)
+            .ok()
+            .filter(|line| !line.is_empty())
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -125,5 +148,23 @@ mod tests {
         for body in [&b""[..], b"L", b"P;k=s", b"AB", b"Q", b"a"] {
             assert_eq!(read(body), None, "{}", String::from_utf8_lossy(body));
         }
+    }
+
+    #[test]
+    fn the_options_a_mark_carries_are_read_past_and_the_ones_it_needs_are_kept() {
+        assert_eq!(aid(b"aid=12;cl=line"), Some("12"));
+        assert_eq!(aid(b"cl=line"), None, "no aid");
+        assert_eq!(aid(b"aid="), None, "an empty one names nothing");
+        assert_eq!(aid(b"aid=\xff"), None, "not UTF-8");
+        assert_eq!(failed_with(b"2;err=no such file"), Some("no such file"));
+        assert_eq!(failed_with(b"2;err="), None);
+        assert_eq!(failed_with(b"2"), None);
+        // Every option the shell integrations write is tolerated, and the mark still reads.
+        assert_eq!(
+            read(b"A;aid=3;cl=line;cmdline_url=false"),
+            Some(Mark::Prompt(Click::Arrows))
+        );
+        assert_eq!(read(b"D;2;aid=3;err=it failed"), Some(Mark::Done(Some(2))));
+        assert_eq!(read(b"C;cmdline_url=false"), Some(Mark::Output));
     }
 }
