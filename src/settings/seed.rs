@@ -47,6 +47,10 @@ pub fn commented(settings: &Settings) -> String {
         &mut out,
         "# A value of the form ${HOME} is read from the environment.",
     );
+    line(
+        &mut out,
+        "# A file may name others with include, a string or a list, laid under this one first.",
+    );
     line(&mut out, "");
     line(&mut out, "# --- the terminal ---");
     field(
