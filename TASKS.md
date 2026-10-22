@@ -431,3 +431,14 @@ Progress truth. Top to bottom, one at a time. A task is ticked only after its co
 - [x] T79 The terminal can say what it found of this machine, on demand: Ctrl-Shift-Alt-H reads the settings file as a fresh start would, counts the four shell integration scripts, and asks each shell the scan found whether it still stands where it stood; the report shows over the terminal, one finding a line, a dash for what stands and a bang for a fault, and goes to the log as well.
 
   - 终端可以按需说明它在这台机器上找到了什么：Ctrl-Shift-Alt-H 像一次全新启动那样读取设置文件、数一数四份 shell 集成脚本、逐个询问扫描到的 shell 是否仍在原处；报告叠在终端上，一行一条，`-` 表示正常、`!` 表示有问题，同时也写入日志。
+
+## 39. Panes and tabs that stay where they are put
+## 39. 停在原处的窗格与标签
+
+- [x] T80 A pane keeps the share it was dragged to, as TAB-15 asks: a pane's width and its row's height are weights that the layout grows by, the border after a pane drags its row's widths and the border under a row drags the rows' heights, a double press on either evens them again, and Ctrl-Shift-Alt-E does the same from the keyboard; a drag stops at five percent so a pane can never vanish.
+
+  - 窗格保留被拖到的份额，这是 TAB-15 所要求的：窗格的宽度与所在行的高度都是权重，布局按权重伸缩；窗格后的边界可拖动该行的宽度，行下的边界可拖动各行的高度，双击任一边界重新均分，Ctrl-Shift-Alt-E 是键盘上的同一件事；拖动到百分之五为止，窗格不会消失。
+
+- [x] T81 A tab moves among its neighbours, and a pinned tab stays in front, as TAB-03 and TAB-04 ask: Ctrl-Shift-Alt-Up and Down move the shown tab a place, Ctrl-Shift-Alt-P pins it, which puts it before the rest and stops it moving or being crossed; the row shows a star beside a pinned tab.
+
+  - 标签可在相邻之间移动，固定的标签停在前面，这是 TAB-03 与 TAB-04 所要求的：Ctrl-Shift-Alt-上下 把当前标签移动一位，Ctrl-Shift-Alt-P 固定它，于是它排在前面、不再移动也不被越过；固定的标签行上有一颗星。

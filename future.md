@@ -133,6 +133,8 @@
 - **STAT-14 / CONN-18**：终端下方一行显示会话所在的连接（`WSL: archlinux`、`ssh: host`）、网格的列数与行数、以及所在分支；会话行在非本机时以连接开头。见 `src/workspace/status.rs` 与 `src/sessions.rs` 的 `connection`。
 - **CFG-05**：`config.toml` 可用 `include`（一个名字或一列名字，相对自身路径）分成多份；被点名的文件先互相叠放，本文件自己的字段再压在上面，所以公共设置只写一处、项目文件只写改动；互相引用成环时遇到已读过的文件就停，缺失的文件报错时点名是哪个文件要它。见 `src/settings/include.rs`。
 - **健康检查（future.md §8 第 20 条）**：`Ctrl-Shift-Alt-H` 按一次就能看到这台机器的状况：设置文件能否读出（含未知字段）、四份 shell 集成脚本是否齐全、扫描到的每个 shell 是否仍在原处，报告叠在终端上、一行一条，`-` 表示正常、`!` 表示有问题，同时写入日志。见 `src/health.rs` 与 `src/workspace/health.rs`。
+- **TAB-15**：窗格的宽度与行的高度改成权重，布局按份额伸缩而不是一律对半分；行内窗格之间的边界可横向拖动改宽度，行与行之间的边界可纵向拖动改高度，双击任一边界把该行与各行重新均分，`Ctrl-Shift-Alt-E` 是键盘上的同一件事；拖动到 5% 为止，窗格不会消失。见 `src/workspace/layout.rs` 与 `src/workspace/panes.rs`。
+- **TAB-03 / TAB-04**：`Ctrl-Shift-Alt-↑/↓` 在会话栏里上移/下移当前标签，`Ctrl-Shift-Alt-P` 固定或取消固定；固定标签排在前面、不再移动也不被越过，行上以 `★` 标出。见 `src/workspace/layout.rs` 的 `Tab::move_by` 与 `Tab::pin`。
 
 ---
 
