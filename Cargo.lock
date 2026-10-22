@@ -1776,6 +1776,7 @@ dependencies = [
  "serde_path_to_error",
  "signal-hook",
  "sysinfo 0.39.6",
+ "toml 0.8.23",
  "unicode-normalization",
  "wayland-backend",
  "wayland-client",

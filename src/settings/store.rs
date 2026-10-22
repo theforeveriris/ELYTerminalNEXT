@@ -22,13 +22,20 @@ pub struct SettingsStore {
 impl Global for SettingsStore {}
 
 impl SettingsStore {
-    /// Loads `settings.json` from the platform config folder into the app.
+    /// Loads `config.toml`, or `settings.json` when there is no TOML, into the app.
     pub fn init(cx: &mut App) -> anyhow::Result<()> {
         let folder = dirs::config_dir().context("settings: the platform names no config folder")?;
-        let path = folder.join("ELYTerminal").join("settings.json");
-        let settings = load(&path)?;
+        let base = folder.join("ELYTerminal");
+        let toml = base.join("config.toml");
+        let path = if toml.exists() {
+            toml
+        } else {
+            base.join("settings.json")
+        };
+        let settings = load_any(&path)?;
         fonts(&settings, cx)
             .with_context(|| format!("settings: {} holds a bad value", path.display()))?;
+        log::info!("settings: reading {}", path.display());
         cx.set_global(Self {
             settings,
             modified: stamp(&path),
@@ -73,7 +80,7 @@ impl SettingsStore {
         if modified == before {
             return Ok(false);
         }
-        let loaded = load(&path).and_then(|settings| {
+        let loaded = load_any(&path).and_then(|settings| {
             fonts(&settings, cx)?;
             Ok(settings)
         });
@@ -141,14 +148,55 @@ pub fn load(path: &Path) -> anyhow::Result<Settings> {
     settings
         .validate()
         .with_context(|| format!("settings: {} holds a bad value", path.display()))?;
+    warn_extra(&settings, path);
+    log::info!("settings: loaded {}", path.display());
+    Ok(settings)
+}
+
+/// The settings in `path`, read as TOML when the file is one and JSON otherwise.
+pub fn load_any(path: &Path) -> anyhow::Result<Settings> {
+    if is_toml(path) {
+        load_toml(path)
+    } else {
+        load(path)
+    }
+}
+
+/// The settings in a TOML file; no file gives the defaults, and a bad one names its line.
+pub fn load_toml(path: &Path) -> anyhow::Result<Settings> {
+    let text = match fs::read_to_string(path) {
+        Ok(text) => text,
+        Err(error) if error.kind() == ErrorKind::NotFound => {
+            log::info!("settings: no file at {}, defaults", path.display());
+            return Ok(Settings::default());
+        }
+        Err(error) => {
+            return Err(error).with_context(|| format!("settings: cannot read {}", path.display()));
+        }
+    };
+    let settings: Settings = toml::from_str(&text)
+        .map_err(|error| anyhow::anyhow!("settings: {} does not parse: {error}", path.display()))?;
+    settings
+        .validate()
+        .with_context(|| format!("settings: {} holds a bad value", path.display()))?;
+    warn_extra(&settings, path);
+    log::info!("settings: loaded {}", path.display());
+    Ok(settings)
+}
+
+/// Logs each field the file names that this version does not know.
+fn warn_extra(settings: &Settings, path: &Path) {
     for key in settings.extra.keys() {
         log::warn!(
             "settings: {} names an unknown field {key:?}; it is kept until the next save",
             path.display()
         );
     }
-    log::info!("settings: loaded {}", path.display());
-    Ok(settings)
+}
+
+/// Whether `path` names a TOML file.
+fn is_toml(path: &Path) -> bool {
+    path.extension().and_then(|extension| extension.to_str()) == Some("toml")
 }
 
 /// Writes a temp file beside `path`, then renames it over `path`.
@@ -160,7 +208,11 @@ pub fn save(path: &Path, settings: &Settings) -> anyhow::Result<()> {
         .with_context(|| format!("settings: {} has no folder", path.display()))?;
     fs::create_dir_all(folder)
         .with_context(|| format!("settings: cannot create {}", folder.display()))?;
-    let mut text = serde_json::to_string_pretty(&settings).context("settings: cannot encode")?;
+    let mut text = if is_toml(path) {
+        toml::to_string_pretty(&settings).context("settings: cannot encode TOML")?
+    } else {
+        serde_json::to_string_pretty(&settings).context("settings: cannot encode")?
+    };
     text.push('\n');
     let count = SAVES.fetch_add(1, Ordering::Relaxed);
     let temp = path.with_extension(format!("json.{}-{count}.tmp", std::process::id()));
@@ -229,6 +281,37 @@ mod tests {
             .set_modified(when)
             .expect("a stamp");
         assert_eq!(stamp(&path), Some(when));
+        fs::remove_dir_all(folder).expect("cleanup");
+    }
+
+    #[test]
+    fn a_toml_file_loads_and_saves_itself() {
+        let folder = folder("toml");
+        let path = folder.join("config.toml");
+        let settings = Settings {
+            font_size: 15.0,
+            theme: "catppuccin-latte".into(),
+            ..Settings::default()
+        };
+        save(&path, &settings).expect("saves TOML");
+        let text = fs::read_to_string(&path).expect("the file");
+        assert!(text.contains("font_size = 15"), "{text}");
+        assert!(text.contains("[custom_colors]"), "{text}");
+        assert_eq!(load_toml(&path).expect("loads"), settings);
+        assert_eq!(load_any(&path).expect("loads"), settings);
+        fs::remove_dir_all(folder).expect("cleanup");
+    }
+
+    #[test]
+    fn a_bad_toml_file_says_where_it_went_wrong() {
+        let folder = folder("bad-toml");
+        let path = folder.join("config.toml");
+        fs::create_dir_all(&folder).expect("a folder");
+        fs::write(&path, "font_size = \"large\"\n").expect("a file");
+        let error = format!("{:#}", load_toml(&path).expect_err("a bad value"));
+        assert!(error.contains("does not parse"), "{error}");
+        assert!(error.contains("line 1"), "{error}");
+        assert!(error.contains("config.toml"), "{error}");
         fs::remove_dir_all(folder).expect("cleanup");
     }
 
