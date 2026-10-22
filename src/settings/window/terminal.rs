@@ -221,12 +221,22 @@ impl SettingsWindow {
             settings.do_not_disturb,
             |settings, on| settings.do_not_disturb = on,
         );
+        let confirm = switch(
+            this,
+            "confirm_close",
+            settings.confirm_close,
+            |settings, on| settings.confirm_close = on,
+        );
         let ely = switch(this, "ely", settings.ely, |settings, on| settings.ely = on);
         let section = section
             .row(SettingsRow::new(language::message(cx, "settings.terminal.copy")).control(copy))
             .row(SettingsRow::new(language::message(cx, "settings.terminal.bell")).control(bell))
             .row(SettingsRow::new(language::message(cx, "settings.terminal.still")).control(still))
             .row(SettingsRow::new(language::message(cx, "settings.terminal.quiet")).control(quiet))
+            .row(
+                SettingsRow::new(language::message(cx, "settings.terminal.confirm"))
+                    .control(confirm),
+            )
             .row(
                 SettingsRow::new(language::message(cx, "settings.terminal.restore"))
                     .control(restore),

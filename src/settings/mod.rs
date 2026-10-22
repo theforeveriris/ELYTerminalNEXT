@@ -102,6 +102,8 @@ pub struct Settings {
     pub reduce_motion: bool,
     /// Posts no system notification while on.
     pub do_not_disturb: bool,
+    /// Asks before closing a session whose command still runs.
+    pub confirm_close: bool,
     /// Ely peeks over the main window's top edge.
     pub ely: bool,
     /// How far in from the pane's left edge she stands, in points, as a drag left her.
@@ -160,6 +162,7 @@ impl Default for Settings {
             bell_visual: true,
             reduce_motion: false,
             do_not_disturb: false,
+            confirm_close: true,
             ely: true,
             ely_left: 140.0,
             check_updates: true,

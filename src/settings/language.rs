@@ -135,6 +135,10 @@ const EN: &[(&str, &str)] = &[
     ("settings.terminal.bell", "Flash on bell"),
     ("settings.terminal.still", "Reduce motion"),
     ("settings.terminal.quiet", "Do not disturb"),
+    (
+        "settings.terminal.confirm",
+        "Confirm closing a running command",
+    ),
     ("settings.terminal.ely", "Ely"),
     (
         "settings.terminal.updates",
@@ -226,6 +230,7 @@ const ZH: &[(&str, &str)] = &[
     ("settings.terminal.bell", "响铃时闪烁"),
     ("settings.terminal.still", "减少动态效果"),
     ("settings.terminal.quiet", "勿扰模式"),
+    ("settings.terminal.confirm", "关闭运行中的命令前确认"),
     ("settings.terminal.ely", "Ely"),
     ("settings.terminal.updates", "自动检查更新"),
     ("settings.terminal.updates.now", "立即检查"),

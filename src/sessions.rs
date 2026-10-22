@@ -163,7 +163,7 @@ pub fn row(
                 ))
                 .on_click(move |_, window, cx| {
                     cx.stop_propagation();
-                    close.update(cx, |this, cx| this.close(id, window, cx))
+                    close.update(cx, |this, cx| this.request_close(id, window, cx))
                 }),
         );
     let item = match &session.editing {

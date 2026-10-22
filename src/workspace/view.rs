@@ -113,7 +113,7 @@ impl Workspace {
                         .tooltip(language::message(cx, "workspace.close_tab"))
                         .on_click(move |_, window, cx| {
                             cx.stop_propagation();
-                            close.update(cx, |this, cx| this.close_tab_at(at, window, cx))
+                            close.update(cx, |this, cx| this.request_close_tab(at, window, cx))
                         }),
                 );
             rows.push(tab_row.into_any_element());
@@ -378,11 +378,9 @@ impl Render for Workspace {
                     this.new_session_in_pane(window, cx)
                 }),
             )
-            .on_action(
-                cx.listener(|this, _: &CloseSession, window, cx| {
-                    this.close(this.active, window, cx)
-                }),
-            )
+            .on_action(cx.listener(|this, _: &CloseSession, window, cx| {
+                this.request_close(this.active, window, cx)
+            }))
             .on_action(cx.listener(|this, _: &NextSession, window, cx| this.step(true, window, cx)))
             .on_action(
                 cx.listener(|this, _: &PreviousSession, window, cx| this.step(false, window, cx)),
@@ -401,7 +399,9 @@ impl Render for Workspace {
                 }
             }))
             .on_action(cx.listener(|this, _: &NewTab, window, cx| this.new_tab(window, cx)))
-            .on_action(cx.listener(|this, _: &CloseTab, window, cx| this.close_tab(window, cx)))
+            .on_action(cx.listener(|this, _: &CloseTab, window, cx| {
+                this.request_close_tab(this.active_tab, window, cx)
+            }))
             .on_action(cx.listener(|this, _: &NextTab, window, cx| this.step_tab(true, window, cx)))
             .on_action(
                 cx.listener(|this, _: &PreviousTab, window, cx| this.step_tab(false, window, cx)),

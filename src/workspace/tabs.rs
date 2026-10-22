@@ -1,6 +1,6 @@
 //! The tabs of the window and the panes in them.
 
-use gpui::{AppContext, Context, Window};
+use gpui::{AppContext, Context, PromptLevel, Window};
 
 use super::layout::{Direction, SessionId, Tab};
 use super::{TITLE, Workspace};
@@ -223,6 +223,13 @@ impl Workspace {
 
     /// Closes the focused pane; its program hangs up.
     pub fn close_pane(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        // A pane with a single session closes it, and asks first when it is busy.
+        if self.tab().is_some_and(|tab| tab.panes.len() <= 1)
+            && let Some(id) = self.tab().and_then(|tab| tab.focused_session())
+        {
+            self.request_close(id, window, cx);
+            return;
+        }
         let Some(tab) = self.tab_mut() else {
             return;
         };
@@ -299,6 +306,66 @@ impl Workspace {
         if let Some(id) = self.tab().and_then(|tab| tab.focused_session()) {
             self.select(id, window, cx);
         }
+    }
+
+    /// Closes session `id`, asking first when its command still runs and the settings ask.
+    pub fn request_close(&mut self, id: SessionId, window: &mut Window, cx: &mut Context<Self>) {
+        let busy = self
+            .session(id)
+            .is_some_and(|session| session.terminal.read(cx).busy());
+        if !self.needs_confirmation(busy, cx) {
+            self.close(id, window, cx);
+            return;
+        }
+        let answer = window.prompt(
+            PromptLevel::Warning,
+            "Close this session?",
+            Some("A command is still running."),
+            &["Cancel", "Close"],
+            cx,
+        );
+        let this = cx.entity();
+        cx.spawn_in(window, async move |_, cx| {
+            if matches!(answer.await, Ok(1)) {
+                this.update_in(cx, |this, window, cx| this.close(id, window, cx))
+                    .ok();
+            }
+        })
+        .detach();
+    }
+
+    /// Closes the tab at `index`, asking first when one of its commands still runs.
+    pub fn request_close_tab(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
+        let busy = self.tabs.get(index).is_some_and(|tab| {
+            tab.sessions().into_iter().any(|id| {
+                self.session(id)
+                    .is_some_and(|session| session.terminal.read(cx).busy())
+            })
+        });
+        if !self.needs_confirmation(busy, cx) {
+            self.close_tab_at(index, window, cx);
+            return;
+        }
+        let answer = window.prompt(
+            PromptLevel::Warning,
+            "Close this tab?",
+            Some("A command is still running."),
+            &["Cancel", "Close"],
+            cx,
+        );
+        let this = cx.entity();
+        cx.spawn_in(window, async move |_, cx| {
+            if matches!(answer.await, Ok(1)) {
+                this.update_in(cx, |this, window, cx| this.close_tab_at(index, window, cx))
+                    .ok();
+            }
+        })
+        .detach();
+    }
+
+    /// Whether closing with `busy` needs a prompt, as the settings decide.
+    fn needs_confirmation(&self, busy: bool, cx: &Context<Self>) -> bool {
+        busy && SettingsStore::get(cx).confirm_close
     }
 
     /// What the shown session is called.
