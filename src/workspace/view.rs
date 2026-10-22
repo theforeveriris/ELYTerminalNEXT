@@ -18,8 +18,8 @@ use gpui::{
 use super::{
     CONTEXT, ClosePane, CloseSession, CloseTab, FocusPane, LastSession, LastTab, NewSession,
     NewTab, NextSession, NextTab, NextUsed, PreviousSession, PreviousTab, PreviousUsed,
-    SelectSession, SelectTab, Side, SplitDown, SplitRight, TogglePanel, ToggleSessions, Workspace,
-    Zen, ZoomPane,
+    SelectSession, SelectTab, Side, SplitDown, SplitRight, SwapPane, TogglePanel, ToggleSessions,
+    Workspace, Zen, ZoomPane,
 };
 use crate::menus;
 use crate::sessions::{self, Session};
@@ -394,6 +394,9 @@ impl Render for Workspace {
             .on_action(cx.listener(|this, focus: &FocusPane, window, cx| {
                 this.focus_pane(focus.0, window, cx)
             }))
+            .on_action(
+                cx.listener(|this, swap: &SwapPane, window, cx| this.swap_pane(swap.0, window, cx)),
+            )
             .child(
                 ResizeBorder::new()
                     .when(self.background.see_through(), ResizeBorder::glass)

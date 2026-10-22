@@ -285,4 +285,19 @@ impl Workspace {
             self.select(id, window, cx);
         }
     }
+
+    /// Exchanges the focused pane with its neighbour, and keeps the moved pane focused.
+    pub(super) fn swap_pane(
+        &mut self,
+        direction: Direction,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if !self.tab_mut().is_some_and(|tab| tab.swap(direction)) {
+            return;
+        }
+        if let Some(id) = self.tab().and_then(|tab| tab.focused_session()) {
+            self.select(id, window, cx);
+        }
+    }
 }

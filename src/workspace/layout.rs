@@ -159,6 +159,17 @@ impl Tab {
         Some(at + 1)
     }
 
+    /// Exchanges the focused pane with its neighbour in `direction`, and moves the focus with it.
+    pub fn swap(&mut self, direction: Direction) -> bool {
+        let Some(neighbour) = self.focus_neighbour(direction) else {
+            return false;
+        };
+        let focused = self.focused;
+        self.panes.swap(focused, neighbour);
+        self.focused = neighbour;
+        true
+    }
+
     /// Removes the pane at `index`; the tab is empty when the last one goes.
     pub fn remove(&mut self, index: usize) -> bool {
         if index >= self.panes.len() {
@@ -294,6 +305,18 @@ mod tests {
         tab.split(true, 9);
         assert_eq!(tab.panes[0].session, 7);
         assert_eq!(tab.panes[1].session, 9);
+    }
+
+    #[test]
+    fn a_pane_swaps_with_its_neighbour_and_the_focus_goes_with_it() {
+        let mut tab = Tab::new(1);
+        tab.split(true, 2);
+        tab.focus(0);
+        assert_eq!(tab.sessions(), vec![1, 2]);
+        assert!(tab.swap(Direction::Right));
+        assert_eq!(tab.sessions(), vec![2, 1]);
+        assert_eq!(tab.focused_session(), Some(1));
+        assert!(!tab.swap(Direction::Right), "no neighbour past the edge");
     }
 
     #[test]

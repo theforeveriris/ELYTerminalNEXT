@@ -71,6 +71,11 @@ pub struct SelectTab(pub usize);
 #[action(namespace = elyterminal, no_json)]
 pub struct FocusPane(pub Direction);
 
+/// Exchanges the focused pane with its neighbour in this direction.
+#[derive(Clone, Debug, PartialEq, Action)]
+#[action(namespace = elyterminal, no_json)]
+pub struct SwapPane(pub Direction);
+
 /// The key context of the main window's content.
 pub const CONTEXT: &str = "Workspace";
 
@@ -106,6 +111,11 @@ pub fn bind_keys(cx: &mut App) {
         ("cmd-shift-enter", "cmd-shift-z")
     } else {
         ("ctrl-shift-enter", "ctrl-shift-z")
+    };
+    let swap = if cfg!(target_os = "macos") {
+        "cmd-alt-shift"
+    } else {
+        "ctrl-alt"
     };
     let context = Some(CONTEXT);
     cx.bind_keys([
@@ -151,6 +161,14 @@ pub fn bind_keys(cx: &mut App) {
         ),
         KeyBinding::new(&format!("{pane}-up"), FocusPane(Direction::Up), context),
         KeyBinding::new(&format!("{pane}-down"), FocusPane(Direction::Down), context),
+        KeyBinding::new(&format!("{swap}-left"), SwapPane(Direction::Left), context),
+        KeyBinding::new(
+            &format!("{swap}-right"),
+            SwapPane(Direction::Right),
+            context,
+        ),
+        KeyBinding::new(&format!("{swap}-up"), SwapPane(Direction::Up), context),
+        KeyBinding::new(&format!("{swap}-down"), SwapPane(Direction::Down), context),
     ]);
 }
 
