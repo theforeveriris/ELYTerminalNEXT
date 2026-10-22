@@ -6,7 +6,40 @@ use ely_gpui_component::terminal::{Target, links};
 
 use super::prompts;
 
-/// The OSC 8 target at `point`, else a URL in its wrapped line; a prompt's own link is no target.
+/// The schemes a link may open: a web page, a mail or a file the platform opens; no `javascript:` or `data:`.
+pub const SCHEMES: [&str; 4] = ["http", "https", "mailto", "file"];
+
+/// Whether `link` is one the user may open: a scheme of its own, and one the terminal lets through.
+pub fn allowed(link: &str) -> bool {
+    let Some((scheme, _)) = scheme(link) else {
+        log::debug!("links: {link:?} names no scheme");
+        return false;
+    };
+    let ok = SCHEMES.iter().any(|one| scheme.eq_ignore_ascii_case(one));
+    if !ok {
+        log::warn!(
+            "links: {scheme:?} is none of {:?}, so it opens not",
+            SCHEMES
+        );
+    }
+    ok
+}
+
+/// `link`'s scheme and what follows it; none when it names no scheme, or is not UTF-8 after it.
+fn scheme(link: &str) -> Option<(&str, &str)> {
+    let (scheme, rest) = link.split_once(':')?;
+    let scheme = scheme.trim();
+    if scheme.is_empty()
+        || scheme
+            .chars()
+            .any(|c| !c.is_ascii_alphanumeric() && !matches!(c, '+' | '-' | '.'))
+    {
+        return None;
+    }
+    Some((scheme, rest))
+}
+
+/// The OSC 8 target at `point`, else a URL in its wrapped line, when it is one the user may open; a prompt's own link is no target.
 pub fn link_at<T>(term: &Term<T>, mut point: Point) -> Option<String> {
     let grid = term.grid();
     if grid[point].flags.contains(Flags::WIDE_CHAR_SPACER) {
@@ -16,7 +49,7 @@ pub fn link_at<T>(term: &Term<T>, mut point: Point) -> Option<String> {
         .hyperlink()
         .filter(|link| link.uri() != prompts::LINK)
     {
-        return Some(link.uri().to_string());
+        return allowed(link.uri()).then(|| link.uri().to_string());
     }
     let end = term.line_search_right(point);
     let mut cell = term.line_search_left(point);
@@ -38,7 +71,7 @@ pub fn link_at<T>(term: &Term<T>, mut point: Point) -> Option<String> {
     links(&text)
         .into_iter()
         .find_map(|(bytes, target)| match target {
-            Target::Url(url) if bytes.contains(&at) => Some(url.to_string()),
+            Target::Url(url) if bytes.contains(&at) && allowed(&url) => Some(url.to_string()),
             _ => None,
         })
 }
@@ -59,6 +92,38 @@ mod tests {
         let mut parser: Processor = Processor::new();
         parser.advance(&mut term, bytes.as_bytes());
         link_at(&term, Point::new(Line(line), Column(column)))
+    }
+
+    #[test]
+    fn a_link_opens_only_what_the_user_may_open() {
+        for ok in [
+            "https://ely.dev/x",
+            "http://ely.dev",
+            "HTTPS://ELY.DEV",
+            "mailto:a@b.c",
+            "file:///a/b",
+        ] {
+            assert!(allowed(ok), "{ok}");
+        }
+        for no in [
+            "javascript:alert(1)",
+            "data:text/html,a",
+            "vbscript:x",
+            "ely.dev",
+            ":x",
+            "1a:",
+            "",
+        ] {
+            assert!(!allowed(no), "{no}");
+        }
+    }
+
+    #[test]
+    fn a_link_the_terminal_refuses_is_no_target() {
+        let text = "a \x1b]8;;javascript:alert(1)\x1b\\x\x1b]8;;\x1b\\ b";
+        assert_eq!(link(text, 0, 3), None);
+        let data = "\x1b]8;;data:text/html,a\x1b\\x\x1b]8;;\x1b\\";
+        assert_eq!(link(data, 0, 0), None);
     }
 
     #[test]

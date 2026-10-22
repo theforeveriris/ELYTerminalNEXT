@@ -102,7 +102,10 @@ mod tests {
             "a direction control that would reorder it"
         );
         assert_eq!(clean("  a  "), "a", "trimmed");
-        assert_eq!(clean("\u{4e2d}\u{200d}\u{6587}"), "\u{4e2d}\u{200d}\u{6587}");
+        assert_eq!(
+            clean("\u{4e2d}\u{200d}\u{6587}"),
+            "\u{4e2d}\u{200d}\u{6587}"
+        );
         let long: String = std::iter::repeat_n('a', SHOWN + 10).collect();
         assert_eq!(clean(&long).chars().count(), SHOWN, "cut to what shows");
     }
