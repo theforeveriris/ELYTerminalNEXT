@@ -1,4 +1,4 @@
-mod blocks;
+﻿mod blocks;
 mod boxes;
 mod click;
 pub(crate) mod device;
@@ -20,7 +20,7 @@ mod paint;
 mod paste;
 mod pointer;
 mod prompts;
-mod pty;
+pub(crate) mod pty;
 mod reports;
 mod scrollbar;
 pub mod shell;

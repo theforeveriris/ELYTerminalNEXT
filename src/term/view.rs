@@ -25,7 +25,6 @@ use gpui::{
 use super::{
     blocks::{Blocks, completion},
     click::Shell,
-    device,
     find::Finder,
     fonts::look,
     frame::frame,
@@ -188,11 +187,6 @@ impl TerminalView {
         self.pty.pid
     }
 
-    /// The modes the grid holds now, as DECRQM reads them.
-    fn term_mode(&self) -> TermMode {
-        *self.pty.term.lock().mode()
-    }
-
     /// What programs in this terminal say they are doing.
     pub fn records(&self) -> &Records {
         &self.records
@@ -320,12 +314,7 @@ impl TerminalView {
                     self.status(status);
                     self.restate(cx);
                 }
-                PtyEvent::Device(query) => {
-                    log::debug!("terminal {}: answers {query:?}", self.pty.pid);
-                    let mouse = self.mouse;
-                    self.pty
-                        .write(query.answer(self.term_mode(), mouse).into_bytes());
-                }
+                PtyEvent::Device(query) => self.answer(query),
                 PtyEvent::Ask(ask) => {
                     self.ask(ask, cx);
                     self.restate(cx);
@@ -395,24 +384,21 @@ impl TerminalView {
                 let size = fit(self.size.0, self.size.1, self.cell);
                 self.pty.write(reply(size).into_bytes());
             }
-            Event::PtyWrite(text) => {
-                let mouse = self.mouse;
-                let honest = device::honest(&text, self.term_mode(), mouse);
-                self.pty.write(honest.unwrap_or(text).into_bytes());
-            }
+            Event::PtyWrite(text) => self.reply(text),
             Event::ChildExit(status) => {
-                // A program that ends at once leaves its own words on the grid; a failed start keeps them.
-                if !status.success() && self.reports == 0 {
-                    let text = self
-                        .pty
-                        .term
-                        .lock()
-                        .selection_to_string()
-                        .unwrap_or_default();
-                    let lines = super::pty::said(&text);
-                    if !lines.is_empty() {
-                        log::info!("terminal {}: it ended saying {lines:?}", self.pty.pid);
-                    }
+                // A program that ends leaves its own words on the grid; the first of them are logged.
+                let said = self
+                    .pty
+                    .term
+                    .lock()
+                    .selection_to_string()
+                    .unwrap_or_default();
+                if !status.success() {
+                    log::info!(
+                        "terminal {}: ended {status}, saying {:?}",
+                        self.pty.pid,
+                        super::pty::said(&said)
+                    );
                 }
                 cx.emit(TerminalEvent::Exited(status))
             }
@@ -515,7 +501,6 @@ impl Render for TerminalView {
                     .inset_0()
                     .border_2()
                     .border_color(cx.theme().colors.warning)
-                    .into_any_element()
             }))
             .children(scrollbar::bar(span, &marks, window, cx))
             .children(self.paste_card(cx).map(|card| card.into_any_element()))
@@ -528,3 +513,4 @@ impl Render for TerminalView {
 
 mod blocks;
 mod busy;
+mod protocol;

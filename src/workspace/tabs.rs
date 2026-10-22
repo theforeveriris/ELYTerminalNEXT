@@ -7,7 +7,9 @@ use super::{TITLE, Workspace};
 use crate::sessions::Session;
 use crate::settings::{Settings, SettingsStore};
 use crate::term::shell::{ShellIntegration, launch};
-use crate::term::{Events, Launch, Pty, Quote, Target, TerminalView, config, opened, spawn};
+use crate::term::{
+    Events, Launch, Pty, Quote, Target, TerminalView, config, opened, pty::failed as failure, spawn,
+};
 
 /// How a session is started again as a clone: its program, in the folder it last reported.
 ///
@@ -22,6 +24,53 @@ pub(crate) fn clone_of(launch: &Launch, folder: &std::path::Path) -> Launch {
 }
 
 impl Workspace {
+    /// A session of the shell the settings name, in home or the shown session's folder.
+    pub(super) fn new_session(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Option<SessionId> {
+        let Some(home) = dirs::home_dir() else {
+            log::error!("app: no home folder, so no new session");
+            return None;
+        };
+        let settings = SettingsStore::get(cx).clone();
+        let session = self
+            .session(self.active)
+            .map(|session| session.folder.as_path());
+        let folder = settings.start_folder(&home, session);
+        if settings.last_folder.as_deref() != Some(folder.to_string_lossy().as_ref()) {
+            let last = folder.display().to_string();
+            if let Err(error) =
+                SettingsStore::update(cx, |settings| settings.last_folder = Some(last.clone()))
+            {
+                log::debug!("app: the last folder stays: {error:#}");
+            }
+        }
+        let started = match launch(
+            &settings.shell,
+            folder.clone(),
+            &cx.global::<ShellIntegration>().0,
+        ) {
+            Ok(launch) => match opened(&launch, (80, 24), (8, 16), config(&settings)) {
+                Ok((pty, events)) => Ok(((pty, events), launch)),
+                Err(failed) => Err(failed),
+            },
+            Err(error) => Err(failure(None, folder, &error, Vec::new())),
+        };
+        match started {
+            Ok(((pty, events), launch)) => {
+                self.start_failed = None;
+                Some(self.add(pty, events, launch, window, cx))
+            }
+            Err(failed) => {
+                log::error!("app: no new session:\n{}", failed.report());
+                self.start_failed = Some(failed);
+                cx.notify();
+                None
+            }
+        }
+    }
     /// The sessions in the order the keys walk them: the shown tab's panes first, then the other tabs'.
     pub(super) fn session_order(&self) -> Vec<SessionId> {
         let mut order: Vec<SessionId> = Vec::new();

@@ -1,4 +1,4 @@
-use std::time::Instant;
+﻿use std::time::Instant;
 
 use gpui::{
     Action, App, AppContext, Context, Entity, FocusHandle, Focusable, KeyBinding, Subscription,
@@ -12,10 +12,7 @@ use crate::{
     sessions::Session,
     sessions::orb,
     settings::SettingsStore,
-    term::{
-        Events, Failed, Launch, Pty, config, failed, opened,
-        shell::{ShellIntegration, launch},
-    },
+    term::{Events, Failed, Launch, Pty},
 };
 
 mod events;
@@ -226,43 +223,11 @@ impl Workspace {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let git = cx.new(|cx| GitPanel::new(launch.cwd.clone(), window, cx));
-        // A change the Git panel made shows in Files' marks too.
-        let acted = cx.subscribe(&git, |this, _, _: &Acted, cx| {
-            let folder = this
-                .session(this.active)
-                .map(|session| session.folder.clone())
-                .unwrap_or_default();
-            this.files.update(cx, |files, cx| files.show(&folder, cx));
-        });
+        let mut workspace = Self::bare(&launch, None, window, cx);
         let saved = SettingsStore::get(cx)
             .restore_session
             .then(Self::saved)
             .flatten();
-        let mut workspace = Self {
-            focus: cx.focus_handle(),
-            sessions: Vec::new(),
-            tabs: Vec::new(),
-            active_tab: 0,
-            active: 0,
-            files: cx.new(|_| Files::new(launch.cwd.clone())),
-            git,
-            background: Blur::new(window, SettingsStore::get(cx)),
-            dragged: Dragged::default(),
-            ticking: None,
-            next_id: 1,
-            zoom: None,
-            zen: false,
-            saving: None,
-            mru: mru::Mru::default(),
-            filter: filter::Filter::new(window, cx),
-            start_failed: None,
-            _settings: cx.observe_global_in::<SettingsStore>(window, |this, window, cx| {
-                this.background.follow(window, SettingsStore::get(cx));
-                cx.notify();
-            }),
-            _acted: acted,
-        };
         let first = workspace.add(pty, events, launch, window, cx);
         let mut first_tab = Tab::new(first);
         if let Some(saved) = &saved
@@ -286,7 +251,18 @@ impl Workspace {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
+        Self::bare(&launch, Some(failed), window, cx)
+    }
+
+    /// A window with no session yet; `failed` says why the one it opened with did not start.
+    fn bare(
+        launch: &Launch,
+        failed: Option<Failed>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
         let git = cx.new(|cx| GitPanel::new(launch.cwd.clone(), window, cx));
+        // A change the Git panel made shows in Files' marks too.
         let acted = cx.subscribe(&git, |this, _, _: &Acted, cx| {
             let folder = this
                 .session(this.active)
@@ -311,7 +287,7 @@ impl Workspace {
             saving: None,
             mru: mru::Mru::default(),
             filter: filter::Filter::new(window, cx),
-            start_failed: Some(failed),
+            start_failed: failed,
             _settings: cx.observe_global_in::<SettingsStore>(window, |this, window, cx| {
                 this.background.follow(window, SettingsStore::get(cx));
                 cx.notify();
@@ -354,48 +330,6 @@ impl Workspace {
                 }
             })
         });
-    }
-
-    /// A session of the shell the settings name, in home or the shown session's folder.
-    fn new_session(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Option<SessionId> {
-        let Some(home) = dirs::home_dir() else {
-            log::error!("app: no home folder, so no new session");
-            return None;
-        };
-        let settings = SettingsStore::get(cx).clone();
-        let session = self
-            .session(self.active)
-            .map(|session| session.folder.as_path());
-        let folder = settings.start_folder(&home, session);
-        if settings.last_folder.as_deref() != Some(folder.to_string_lossy().as_ref()) {
-            let last = folder.display().to_string();
-            if let Err(error) =
-                SettingsStore::update(cx, |settings| settings.last_folder = Some(last.clone()))
-            {
-                log::debug!("app: the last folder stays: {error:#}");
-            }
-        }
-        let home_folder = folder.clone();
-        let launched = launch(&settings.shell, folder, &cx.global::<ShellIntegration>().0);
-        let started = match launched {
-            Ok(launch) => match opened(&launch, (80, 24), (8, 16), config(&settings)) {
-                Ok((pty, events)) => Ok(((pty, events), launch)),
-                Err(failed) => Err(failed),
-            },
-            Err(error) => Err(failed(None, home_folder, &error, Vec::new())),
-        };
-        match started {
-            Ok(((pty, events), launch)) => {
-                self.start_failed = None;
-                Some(self.add(pty, events, launch, window, cx))
-            }
-            Err(failed) => {
-                log::error!("app: no new session:\n{}", failed.report());
-                self.start_failed = Some(failed);
-                cx.notify();
-                None
-            }
-        }
     }
 
     /// Opens a session in a new pane of the shown tab: beside the only one, or in a split of the focused one.
