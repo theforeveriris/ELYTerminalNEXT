@@ -159,7 +159,16 @@ impl SettingsWindow {
             )
             .row(
                 SettingsRow::new(language::message(cx, "settings.terminal.title"))
-                    .description(language::message(cx, "settings.terminal.title.hint"))
+                    .description(language::message_with(
+                        cx,
+                        "settings.terminal.title.hint",
+                        &[
+                            ("title", "{title}"),
+                            ("cwd", "{cwd}"),
+                            ("shell", "{shell}"),
+                            ("title ", "{title} — {cwd}"),
+                        ],
+                    ))
                     .control(PathInput::new("settings-window-title", &self.window_title)),
             )
             .row(

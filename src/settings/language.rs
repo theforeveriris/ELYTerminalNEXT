@@ -262,6 +262,11 @@ const ZH: &[(&str, &str)] = &[
     ("workspace.files", "文件"),
 ];
 
+/// The message for `key`, in the language the interface is in; `args` fill each `{name}` the message holds.
+pub fn message_with(cx: &App, key: &str, args: &[(&str, &str)]) -> String {
+    text(cx, key, args).to_string()
+}
+
 /// The message for `key`, in the language the interface is in.
 pub fn message(cx: &App, key: &str) -> String {
     text(cx, key, &[]).to_string()
