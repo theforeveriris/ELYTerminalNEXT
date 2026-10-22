@@ -467,9 +467,10 @@ impl Workspace {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
 
     use super::*;
-    use std::path::PathBuf;
+
     fn launch(cwd: &str) -> Launch {
         Launch {
             program: Some(("/bin/sh".into(), vec!["-l".into()])),
