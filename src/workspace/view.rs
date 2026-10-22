@@ -17,8 +17,8 @@ use gpui::{
 };
 
 use super::{
-    CONTEXT, ClosePane, CloseSession, CloseTab, FocusPane, LastSession, LastTab, NewSession,
-    NewTab, NextSession, NextTab, NextUsed, PreviousSession, PreviousTab, PreviousUsed,
+    CONTEXT, CloneSession, ClosePane, CloseSession, CloseTab, FocusPane, LastSession, LastTab,
+    NewSession, NewTab, NextSession, NextTab, NextUsed, PreviousSession, PreviousTab, PreviousUsed,
     SelectSession, SelectTab, Side, SplitDown, SplitRight, SwapPane, TogglePanel, ToggleSessions,
     Workspace, Zen, ZoomPane,
 };
@@ -427,6 +427,10 @@ impl Render for Workspace {
                 }
             }))
             .on_action(cx.listener(|this, _: &NewTab, window, cx| this.new_tab(window, cx)))
+            .on_action(cx.listener(|this, _: &CloneSession, window, cx| {
+                let id = this.active;
+                this.clone_session(id, window, cx)
+            }))
             .on_action(cx.listener(|this, _: &CloseTab, window, cx| {
                 this.request_close_tab(this.active_tab, window, cx)
             }))

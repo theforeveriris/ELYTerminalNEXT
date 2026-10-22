@@ -18,8 +18,8 @@ use crate::{
     },
     updates::{self, Updates, VERSION},
     workspace::{
-        self, CloseSession, LastSession, NewSession, NextSession, NextUsed, PreviousSession,
-        PreviousUsed, SelectSession, TogglePanel, ToggleSessions,
+        self, CloneSession, CloseSession, LastSession, NewSession, NextSession, NextUsed,
+        PreviousSession, PreviousUsed, SelectSession, TogglePanel, ToggleSessions,
     },
 };
 
@@ -345,6 +345,7 @@ thread_local! {
             ("Sessions", "Last session", LastSession.boxed_clone()),
             ("Tabs", "Next used tab", NextUsed.boxed_clone()),
             ("Tabs", "Previous used tab", PreviousUsed.boxed_clone()),
+            ("Tabs", "Clone session in a new tab", CloneSession.boxed_clone()),
             ("Edit", "Copy", Copy.boxed_clone()),
             ("Edit", "Paste", Paste.boxed_clone()),
             ("Edit", "Select all", SelectAll.boxed_clone()),

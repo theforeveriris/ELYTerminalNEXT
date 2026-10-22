@@ -52,7 +52,8 @@ actions!(
         SplitDown,
         ClosePane,
         ZoomPane,
-        Zen
+        Zen,
+        CloneSession
     ]
 );
 
@@ -117,6 +118,11 @@ pub fn bind_keys(cx: &mut App) {
     } else {
         "ctrl-alt"
     };
+    let tab_clone = if cfg!(target_os = "macos") {
+        "cmd-shift-k"
+    } else {
+        "ctrl-shift-k"
+    };
     let context = Some(CONTEXT);
     cx.bind_keys([
         KeyBinding::new(sessions, ToggleSessions, context),
@@ -132,6 +138,8 @@ pub fn bind_keys(cx: &mut App) {
         KeyBinding::new(zoom, ZoomPane, context),
         KeyBinding::new(zen, Zen, context),
     ]);
+    // TAB-13: a clone opens beside what it copies, with no scrollback and no running state.
+    cx.bind_keys([KeyBinding::new(tab_clone, CloneSession, context)]);
     cx.bind_keys([
         KeyBinding::new(new, NewSession, context),
         KeyBinding::new(close, CloseSession, context),

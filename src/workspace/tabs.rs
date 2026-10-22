@@ -7,7 +7,19 @@ use super::{TITLE, Workspace};
 use crate::sessions::Session;
 use crate::settings::{Settings, SettingsStore};
 use crate::term::shell::{ShellIntegration, launch};
-use crate::term::{Events, Launch, Pty, Quote, Target, TerminalView, config, spawn};
+use crate::term::{Events, Launch, Pty, Quote, Target, TerminalView, config, opened, spawn};
+
+/// How a session is started again as a clone: its program, in the folder it last reported.
+///
+/// A clone takes no scrollback and no running state with it: the terminal is new, and only the
+/// program, its variables and the folder are the same, so a tab opened beside one in `~/src/api`
+/// starts there too.
+pub(crate) fn clone_of(launch: &Launch, folder: &std::path::Path) -> Launch {
+    Launch {
+        cwd: folder.to_path_buf(),
+        ..launch.clone()
+    }
+}
 
 impl Workspace {
     /// The sessions in the order the keys walk them: the shown tab's panes first, then the other tabs'.
@@ -50,8 +62,9 @@ impl Workspace {
             title: String::new(),
             name: String::new(),
             editing: None,
-            folder: launch.cwd,
+            folder: launch.cwd.clone(),
             reports: launch.reports,
+            launch,
             bell: false,
             waiting: false,
             look: None,
@@ -106,6 +119,31 @@ impl Workspace {
         self.active_tab = self.tabs.len() - 1;
         self.select(id, window, cx);
         log::info!("app: ssh connects to {host}");
+    }
+
+    /// Opens a tab with a session of its own: the same program, in the same folder as `id`'s.
+    pub fn clone_session(&mut self, id: SessionId, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(session) = self.session(id) else {
+            return;
+        };
+        let launch = clone_of(&session.launch, &session.folder);
+        let name = session.named().to_string();
+        let settings = SettingsStore::get(cx).clone();
+        let (pty, events) = match opened(&launch, (80, 24), (8, 16), config(&settings)) {
+            Ok(started) => started,
+            Err(failed) => {
+                log::error!("app: no clone of {id}:\n{}", failed.report());
+                return;
+            }
+        };
+        let clone = self.add(pty, events, launch, window, cx);
+        self.tabs.push(Tab::new(clone));
+        self.active_tab = self.tabs.len() - 1;
+        self.select(clone, window, cx);
+        log::info!(
+            "app: tab {} opens as a clone of {name}",
+            self.active_tab + 1
+        );
     }
 
     /// Closes the tab at `index`; its sessions' programs hang up.
@@ -379,5 +417,40 @@ impl Workspace {
             log::debug!("app: the title is {title:?}");
             window.set_window_title(title);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use super::*;
+
+    fn launch(cwd: &str) -> Launch {
+        Launch {
+            program: Some(("/bin/sh".into(), vec!["-l".into()])),
+            cwd: PathBuf::from(cwd),
+            env: vec![("ELY".into(), "ok".into())],
+            reports: true,
+            quote: Quote::Posix,
+            target: Target::Local,
+        }
+    }
+
+    #[test]
+    fn a_clone_runs_the_same_program_in_the_folder_its_original_reports() {
+        let started = launch("/home/me");
+        let clone = clone_of(&started, &PathBuf::from("/home/me/src/api"));
+        assert_eq!(clone.cwd, PathBuf::from("/home/me/src/api"));
+        assert_eq!(clone.program, started.program, "the same program");
+        assert_eq!(clone.env, started.env, "the same variables");
+        assert_eq!(clone.reports, started.reports);
+        assert_eq!(clone.quote, started.quote);
+        assert_eq!(clone.target, started.target);
+        assert_eq!(
+            started.cwd,
+            PathBuf::from("/home/me"),
+            "the original is left alone"
+        );
     }
 }

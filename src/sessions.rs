@@ -36,6 +36,8 @@ pub struct Session {
     pub folder: PathBuf,
     /// Its shell has integration, or it reported a folder anyway.
     pub reports: bool,
+    /// How it was started, which a clone of it runs again.
+    pub launch: crate::term::Launch,
     /// A bell rang while it was hidden.
     pub bell: bool,
     /// It started waiting on the user while hidden.
