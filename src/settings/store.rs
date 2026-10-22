@@ -22,15 +22,22 @@ pub struct SettingsStore {
 impl Global for SettingsStore {}
 
 impl SettingsStore {
-    /// Loads `config.toml`, or `settings.json` when there is no TOML, into the app.
+    /// Loads `config.toml`, or `settings.json` when there is no TOML, into the app; the first run
+    /// writes a `config.toml` of its own, each field with a comment saying what it does.
     pub fn init(cx: &mut App) -> anyhow::Result<()> {
         let folder = dirs::config_dir().context("settings: the platform names no config folder")?;
         let base = folder.join("ELYTerminal");
         let toml = base.join("config.toml");
-        let path = if toml.exists() {
+        let json = base.join("settings.json");
+        // CFG-16: the first run writes a config.toml of its own, each field under a comment saying
+        // what it sets, so the file the user finds is one they can read and change.
+        let path = if !toml.exists() && !json.exists() {
+            seeded(&toml)?;
+            toml
+        } else if toml.exists() {
             toml
         } else {
-            base.join("settings.json")
+            json
         };
         let settings = load_any(&path)?;
         fonts(&settings, cx)
@@ -117,6 +124,37 @@ fn fonts(settings: &Settings, cx: &App) -> anyhow::Result<()> {
             .with_context(|| field.to_string())?;
     }
     Ok(())
+}
+
+/// Writes `path`, a `config.toml` of the defaults with a comment over each field, when it is not there.
+///
+/// A settings file found on the first run is one the user did not write and cannot read. This one
+/// says what each field sets and what else it could be, so the file is the documentation for the
+/// settings the window shows. An existing file is never overwritten: a user's own is theirs.
+pub fn seeded(path: &Path) -> anyhow::Result<()> {
+    let settings = Settings::default();
+    let lines = crate::settings::commented(&settings);
+    let folder = path
+        .parent()
+        .with_context(|| format!("settings: {} has no folder", path.display()))?;
+    fs::create_dir_all(folder)
+        .with_context(|| format!("settings: cannot create {}", folder.display()))?;
+    // An existing file stays: only a first run writes one, and a crash must not lose the user's.
+    match fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)
+        .and_then(|mut file| file.write_all(lines.as_bytes()))
+    {
+        Ok(()) => {
+            log::info!("settings: wrote {} with its defaults", path.display());
+            Ok(())
+        }
+        Err(error) if error.kind() == ErrorKind::AlreadyExists => Ok(()),
+        Err(error) => {
+            Err(error).with_context(|| format!("settings: cannot write {}", path.display()))
+        }
+    }
 }
 
 /// The file's settings; defaults when there is no file. A file that fails to read or check is an error.
