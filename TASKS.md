@@ -456,3 +456,21 @@ Progress truth. Top to bottom, one at a time. A task is ticked only after its co
 - [x] T83 The window's title is a template the user writes, as UI-17 asks: `{title}`, `{cwd}` and `{shell}` stand for the session's name, its folder as the sessions column writes it and its program's name, and a template that names none of them falls back to the session's name; Settings › Terminal carries the field, and the seeded `config.toml` explains the variables.
 
   - 窗口标题是用户自己写的模板，这是 UI-17 所要求的：`{title}`、`{cwd}`、`{shell}` 分别代表会话名、按会话栏写法显示的目录、以及程序名，一个变量都不含时退回会话名；设置 › Terminal 有对应输入框，种子 `config.toml` 里说明了这几个变量。
+## 42. The colors of the user's own
+## 42. 用户自己的颜色
+
+- [x] T84 The custom theme is a picker for every role it colors, as UI-02 asks: the settings page groups them as the window, the cursor, the selection and the sixteen ANSI colors, each cell a picker that writes as it moves and shows its hex, and a button that starts the colors from the theme in use rather than from a fixed default; a name and Save keep them as a theme of their own, listed in both theme grids, a repeated name taking the next number, and one can be deleted, putting the custom theme back on if it was the one worn.
+
+  - 自定义主题为它上色的每个角色都有一只取色器，这是 UI-02 所要求的：设置页把它们分成界面、光标、选区与十六个 ANSI 颜色，每格一只取色器，移动即写入并标出十六进制；另有一个按钮从正在使用的主题载入颜色，而不是从一个固定的默认值开始；起名保存就得到一份独立主题，在两个主题网格里都列出，重名自动加序号，也可以删除，删的是正在用的那份时退回自定义主题。
+## 43. A shell of the user's choosing
+## 43. 自己挑一个 shell
+
+- [x] T85 The shell a session starts is picked, not typed from memory, as SHELL-02 and SHELL-04 ask: the Terminal settings' Shell is a list of every shell the scan found, with its version, chosen writes its path, and the field for a path stays under it for one the scan did not find; the sessions column's plus keeps opening the default session when pressed and its arrow lists every scanned shell and every ssh host, each opening a tab of its own in the folder a new session would start in.
+
+  - 会话用哪个 shell 是选出来的，不必凭记忆写，这是 SHELL-02 与 SHELL-04 所要求的：终端设置里的 Shell 是扫描到的每个 shell 的列表并带版本，选中即写入其路径，扫描不到的 shell 仍可在下面的路径框里填写；会话栏的「+」正按仍是默认会话，旁边的箭头列出每个扫描到的 shell 与每个 ssh 主机，各自开一个标签，起始目录与新建会话一致。
+## 44. A tab that folds
+## 44. 会折叠的标签
+
+- [x] T86 A tab folds its panes away when its own row is pressed, as TAB-04 and TAB-30 ask: a second press unfolds them, pressing another tab shows that one open, and a folded row keeps its pane count beside its name; the fold is kept in the session file and a file that never said stays open, while the keyboard still walks the panes a folded tab holds, since folding is what the column shows, not what the window holds.
+
+  - 按一下标签自己的那一行，它下面的窗格就折起来，这是 TAB-04 与 TAB-30 所要求的：再按一下展开，按别的标签则切过去并展开它，折叠的行在名字旁始终显示窗格数；折叠写进会话文件，没写过的文件保持展开；键盘仍会走进折叠标签里的窗格，因为折叠只是侧栏画出来的样子，不是窗口里没有的东西。

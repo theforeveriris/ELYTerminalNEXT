@@ -139,6 +139,9 @@
 - **STAT-19 / FIND-08**：会话行的悬停列出该会话里失败过的命令——一条时直接点名，多条时给出条数再逐条列出；`Ctrl-Shift-Alt-↑/↓` 在终端里跳到上一条/下一条失败命令。见 `src/sessions.rs` 的 `hover` 与 `src/term/blocks.rs` 的 `step`。
 - **INP-14（部分）**：设置 › Terminal 的快捷键表补上本 fork 新增的全部按键并可搜索，`Ctrl-Shift-/` 直接从终端打开它。见 `src/settings/window/terminal.rs`。
 - **UI-17**：窗口标题是一个模板，`{title}`、`{cwd}`、`{shell}` 分别代表会话名、按会话栏写法显示的目录、以及程序名（去掉扩展名）；模板为空或一个变量都不含时退回会话名。设置 › Terminal 有对应输入框，种子 `config.toml` 里也有说明。见 `src/settings/title.rs` 与 `src/workspace/title.rs`。
+- **UI-02（自定义主题）**：设置里的自定义配色恢复成四组自适应格子——界面、光标、选区、ANSI 颜色，每格一个取色器并写明十六进制；「从当前主题载入」把正在使用的主题颜色填进来，改色即生效。起一个名字按「保存为主题」，这份颜色就成为独立主题，出现在浅色与深色两个主题网格里；重名自动加序号（`名字 2`），可删除，删掉正在用的那份时退回自定义主题。见 `src/settings/window/custom.rs`、`src/themes/custom.rs` 的 `SavedTheme` 与 `src/settings/window/themegrid.rs`。
+- **SHELL-02 / SHELL-04（选择 shell）**：设置 › Terminal 的 Shell 是一个下拉，列出扫描到的每个 shell 与它的版本，选中即写入其路径；下面仍保留手填路径的输入框，扫描不到的 shell 照样能用。会话栏的「+」分成两半：正按仍开默认会话，旁边的箭头列出每个扫描到的 shell 与每个 ssh 主机，选一个就开它自己的标签，起始目录与新建会话一致。见 `src/settings/window/terminal.rs` 与 `src/workspace/open.rs`。
+- **TAB-04 / TAB-30（标签折叠）**：按一下标签自己的那一行就把它下面的窗格折起来，再按一下展开，按别的标签则切过去并展开它；折叠的标签行右侧始终显示它有几个窗格，折叠状态写进 `session.json`，旧文件没写就是展开。折叠只是视觉上的：`Ctrl+Shift+←/→` 仍会走到折叠里的窗格，新分出的窗格会把标签展开。见 `src/workspace/layout.rs` 的 `Tab::collapsed` 与 `src/workspace/tabs.rs` 的 `tap_tab`。
 
 ---
 
