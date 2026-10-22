@@ -417,3 +417,10 @@ Progress truth. Top to bottom, one at a time. A task is ticked only after its co
 - [x] T77 A session says where it sits, as STAT-14, STAT-17 and CONN-18 ask: the terminal's column shows the branch the shown session's folder sits in, read from the nearest `.git/HEAD` or a worktree's gitfile; a line under the terminal says the connection, the grid's cells and the branch, each left out where it says nothing; a session row on another machine leads with that machine — `WSL: archlinux`, `ssh: host`.
 
   - 会话说明自己在哪里，这是 STAT-14、STAT-17 与 CONN-18 所要求的：终端列显示当前会话所在目录的 Git 分支，读最近的 `.git/HEAD` 或 worktree 的 gitfile；终端下方一行显示连接、网格的列数与行数以及分支，没有内容的部分就不出现；在另一台机器上的会话行以那台机器开头——`WSL: archlinux`、`ssh: host`。
+
+## 37. Settings that build on each other
+## 37. 互相叠放的设置
+
+- [x] T78 A settings file may build on the files it names, as CFG-05 asks: `config.toml` names others with `include`, one or a list, each relative to itself; they are laid over one another first and the file's own fields go over theirs, so shared settings live in one place and a project's file says only what it changes; a loop stops at a file already read, and a missing one names the file that asked for it.
+
+  - 设置文件可以建立在它点名的文件之上，这是 CFG-05 所要求的：`config.toml` 用 `include`（一个名字或一列名字，相对自身路径）点名其他文件；它们先互相叠放，本文件自己的字段再压在上面，所以公共设置只写一处、项目文件只写改动；成环时遇到已读过的文件就停，缺失的文件报错时点名是哪个文件要它。
